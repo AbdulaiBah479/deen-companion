@@ -1,0 +1,4 @@
+Contact: see the Privacy page of this site (/legal/privacy)
+Policy: see SECURITY.md in the project repository
+Preferred-Languages: en
+Expires: 2027-10-01T00:00:00.000Z

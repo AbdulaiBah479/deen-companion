@@ -1,0 +1,264 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans), system-ui, Arial, sans-serif;
+  --font-heading: var(--font-sans);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+body {
+  font-family: var(--font-geist-sans), system-ui, Arial, sans-serif;
+}
+
+:root {
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --radius: 0.625rem;
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
+}
+/* Tajweed colours (quran.com rule classes) */
+.tj-ghunnah { color: #ea580c; }
+.tj-ikhafa, .tj-ikhafa_shafawi { color: #be185d; }
+.tj-idgham_ghunnah, .tj-idgham_shafawi, .tj-idgham_mutajanisayn, .tj-idgham_mutaqaribayn { color: #15803d; }
+.tj-idgham_wo_ghunnah { color: #6b7280; }
+.tj-iqlab { color: #0891b2; }
+.tj-qalaqah { color: #2563eb; }
+.tj-madda_normal { color: #b45309; }
+.tj-madda_permissible { color: #d97706; }
+.tj-madda_necessary { color: #b91c1c; }
+.tj-madda_obligatory { color: #dc2626; }
+.tj-ham_wasl, .tj-slnt, .tj-laam_shamsiyah { color: #9ca3af; }
+
+/* Kids mode: bigger, friendlier text */
+html[data-kids="true"] { font-size: 118%; }
+html[data-kids="true"] h1 { letter-spacing: 0.01em; }
+
+/* ───────────────────────── Themes ─────────────────────────
+   The pages use plain Tailwind colour utilities. Rather than rewrite every page, dark and sepia remap
+   those utilities. Selectors are more specific than Tailwind's, so they win regardless of order.
+   Theme is chosen in Settings and applied to <html data-theme="light|dark|sepia"> before first paint. */
+
+:root {
+  --ar-size: 30px; /* Arabic text size in the reader (user adjustable) */
+  --tr-size: 16px; /* translation text size */
+}
+
+/* Arabic text everywhere uses a proper Quran typeface */
+[lang="ar"] {
+  font-family: var(--font-quran), "Amiri Quran", "Noto Naskh Arabic", "Traditional Arabic", serif;
+}
+
+/* ── Dark ── */
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --background: #0d1512;
+  --foreground: #e8efe9;
+}
+html[data-theme="dark"] body { background: #0d1512; color: #e8efe9; }
+html[data-theme="dark"] .bg-white { background-color: #16211c; }
+html[data-theme="dark"] .bg-\[\#F8FAFC\] { background-color: #0d1512; }
+html[data-theme="dark"] .bg-gray-100 { background-color: #1c2a24; }
+html[data-theme="dark"] .bg-gray-200 { background-color: #2a3a33; }
+html[data-theme="dark"] .border-gray-100,
+html[data-theme="dark"] .border-gray-200 { border-color: #263830; }
+html[data-theme="dark"] .border-gray-300 { border-color: #34493f; }
+html[data-theme="dark"] .text-gray-900,
+html[data-theme="dark"] .text-gray-800 { color: #eef3ef; }
+html[data-theme="dark"] .text-gray-700 { color: #d3ddd6; }
+html[data-theme="dark"] .text-gray-600 { color: #b7c4bb; }
+html[data-theme="dark"] .text-gray-500 { color: #98a99f; }
+html[data-theme="dark"] .text-gray-400 { color: #7d8f85; }
+html[data-theme="dark"] .text-\[\#0F766E\] { color: #3fd0a4; }
+html[data-theme="dark"] .border-\[\#0F766E\] { border-color: #2fb58c; }
+html[data-theme="dark"] .bg-green-100 { background-color: #14352a; }
+html[data-theme="dark"] .bg-red-100 { background-color: #3a1c1c; }
+html[data-theme="dark"] .hover\:bg-gray-100:hover { background-color: #1c2a24; }
+html[data-theme="dark"] input,
+html[data-theme="dark"] select,
+html[data-theme="dark"] textarea { background-color: #16211c; color: #eef3ef; border-color: #34493f; }
+html[data-theme="dark"] ::placeholder { color: #7d8f85; }
+html[data-theme="dark"] .tj-ham_wasl, html[data-theme="dark"] .tj-slnt, html[data-theme="dark"] .tj-laam_shamsiyah { color: #7d8f85; }
+
+/* ── Sepia (warm paper, easy on the eyes for long reading) ── */
+html[data-theme="sepia"] {
+  --background: #f1e7d0;
+  --foreground: #3b2f1c;
+}
+html[data-theme="sepia"] body { background: #f1e7d0; color: #3b2f1c; }
+html[data-theme="sepia"] .bg-white { background-color: #faf2e0; }
+html[data-theme="sepia"] .bg-\[\#F8FAFC\] { background-color: #f1e7d0; }
+html[data-theme="sepia"] .bg-gray-100 { background-color: #efe3c6; }
+html[data-theme="sepia"] .bg-gray-200 { background-color: #e3d4b0; }
+html[data-theme="sepia"] .border-gray-100,
+html[data-theme="sepia"] .border-gray-200 { border-color: #e0cfa6; }
+html[data-theme="sepia"] .border-gray-300 { border-color: #d3bf91; }
+html[data-theme="sepia"] .text-gray-900,
+html[data-theme="sepia"] .text-gray-800 { color: #3b2f1c; }
+html[data-theme="sepia"] .text-gray-700 { color: #54452c; }
+html[data-theme="sepia"] .text-gray-600 { color: #6b5a3c; }
+html[data-theme="sepia"] .text-gray-500 { color: #85734f; }
+html[data-theme="sepia"] .text-gray-400 { color: #9d8a63; }
+html[data-theme="sepia"] input,
+html[data-theme="sepia"] select,
+html[data-theme="sepia"] textarea { background-color: #faf2e0; color: #3b2f1c; border-color: #d3bf91; }
+
+/* ── Reading ── */
+.verse-ar { font-size: var(--ar-size); line-height: 2.3; }
+.verse-tr { font-size: var(--tr-size); line-height: 1.65; }
+.mushaf { font-size: var(--ar-size); line-height: 2.5; text-align: justify; text-align-last: center; }
+.ayah-end { color: #b8962e; font-size: 0.7em; margin: 0 0.15em; white-space: nowrap; }
+.verse-hit { border-radius: 0.5rem; cursor: pointer; transition: background-color 0.15s; }
+.verse-hit:hover { background-color: rgba(15, 118, 110, 0.08); }
+.verse-active { background-color: rgba(212, 175, 55, 0.22); }
+
+/* ── Reels: full-screen vertical feed ── */
+.reels-scroll { scroll-snap-type: y mandatory; overflow-y: scroll; overscroll-behavior: contain; scrollbar-width: none; }
+.reels-scroll::-webkit-scrollbar { display: none; }
+.reel { scroll-snap-align: start; scroll-snap-stop: always; }
+.reel-pattern {
+  background-image:
+    radial-gradient(circle at 20% 15%, rgba(255,255,255,0.10) 0, transparent 38%),
+    radial-gradient(circle at 85% 90%, rgba(0,0,0,0.25) 0, transparent 45%),
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'><g fill='none' stroke='white' stroke-opacity='0.07' stroke-width='1'><path d='M40 4 L52 28 L76 40 L52 52 L40 76 L28 52 L4 40 L28 28 Z'/><circle cx='40' cy='40' r='9'/></g></svg>");
+}
+@keyframes reel-pop { 0% { transform: scale(0.6); opacity: 0 } 40% { transform: scale(1.25); opacity: 1 } 100% { transform: scale(1); opacity: 1 } }
+.reel-pop { animation: reel-pop 0.35s ease-out; }
+@media (prefers-reduced-motion: reduce) { .reel-pop { animation: none; } .reels-scroll { scroll-behavior: auto; } }
+
+
+/* Gold text that stays readable: dark gold on light backgrounds, the bright gold on dark ones. (#D4AF37 on white is only 2.1:1.) */
+.text-gold { color: #7a5c00; }
+html[data-theme="dark"] .text-gold { color: #e6c86a; }
+/* The pale teal chip background needs a dark equivalent so its teal text keeps contrast. */
+html[data-theme="dark"] .bg-\[\#E6F4F1\] { background-color: #14352a; }
+html[data-theme="sepia"] .bg-\[\#E6F4F1\] { background-color: #e8dfc4; }
+
+/* Status colours that stay readable on dark backgrounds. */
+html[data-theme="dark"] .text-\[\#134E4A\] { color: #cfe9e0; }
+html[data-theme="dark"] .text-red-500, html[data-theme="dark"] .text-red-600, html[data-theme="dark"] .text-red-700 { color: #ff9b92; }
+html[data-theme="dark"] .text-amber-600, html[data-theme="dark"] .text-amber-700, html[data-theme="dark"] .text-amber-800 { color: #f2bd6b; }
+html[data-theme="dark"] .text-green-600, html[data-theme="dark"] .text-green-700, html[data-theme="dark"] .text-green-800 { color: #7fe0b0; }
+
+/* Teal banner with the star pattern drawn over the gradient (the pattern alone, `reel-pattern`, would wipe the gradient out). */
+.hero-teal {
+  background-image:
+    radial-gradient(circle at 20% 15%, rgba(255,255,255,0.10) 0, transparent 38%),
+    radial-gradient(circle at 85% 90%, rgba(0,0,0,0.25) 0, transparent 45%),
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'><g fill='none' stroke='white' stroke-opacity='0.07' stroke-width='1'><path d='M40 4 L52 28 L76 40 L52 52 L40 76 L28 52 L4 40 L28 28 Z'/><circle cx='40' cy='40' r='9'/></g></svg>"),
+    linear-gradient(135deg, #0F766E, #0D6B5E 50%, #15803D);
+}

@@ -1,0 +1,28 @@
+name: Prayer reminders
+
+# Wakes the app every few minutes so it can send the prayer reminders that are due (Web Push).
+# GitHub's scheduler runs "every 5 minutes" at best, and sometimes a few minutes late — the app looks 6 minutes back each time,
+# so a reminder is still sent (once) if a run is late. For tighter timing use a free cron service (cron-job.org, 1-minute) to call
+# the same address instead, and turn this schedule off.
+#
+# Needs two repository secrets (Settings → Secrets and variables → Actions):
+#   APP_URL      e.g. https://deen.example.com        (no trailing slash)
+#   CRON_SECRET  the same value as the CRON_SECRET environment variable of the app
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Send due reminders
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$APP_URL" ] || [ -z "$CRON_SECRET" ]; then echo "APP_URL / CRON_SECRET secrets are not set — nothing to do."; exit 0; fi
+          curl --fail --silent --show-error --max-time 60 -X POST -H "Authorization: Bearer $CRON_SECRET" "$APP_URL/api/push/dispatch"

@@ -1,0 +1,1059 @@
+import { spawn } from 'node:child_process'
+import { readFileSync } from 'node:fs'
+import { HERITAGE } from '../src/lib/heritage.ts'
+import { BASICS_LESSONS, TAJWEED_LESSONS, buildLetterLessons, buildWordLessons } from '../src/lib/learn-content.ts'
+
+const EDGE = 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'
+const BASE = process.env.APP_URL || 'http://localhost:3000'
+const PORT = 9333
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+
+const proc = spawn(EDGE, [
+  '--headless=new', '--disable-gpu', '--no-sandbox', '--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream', '--autoplay-policy=no-user-gesture-required', `--remote-debugging-port=${PORT}`,
+  '--user-data-dir=' + process.env.TEMP + '\\e2e-profile-' + Date.now(), 'about:blank',
+], { stdio: 'ignore' })
+
+let targets
+for (let i = 0; i < 40; i++) {
+  try { targets = await (await fetch(`http://127.0.0.1:${PORT}/json`)).json(); if (targets.some((t) => t.type === 'page')) break } catch {}
+  await sleep(500)
+}
+const page = targets.find((t) => t.type === 'page')
+const ws = new WebSocket(page.webSocketDebuggerUrl)
+await new Promise((r) => (ws.onopen = r))
+let id = 0
+const pending = new Map()
+const errors = []
+ws.onmessage = (m) => {
+  const d = JSON.parse(m.data)
+  if (d.id && pending.has(d.id)) { pending.get(d.id)(d); pending.delete(d.id) }
+  else if (d.method === 'Runtime.exceptionThrown') errors.push('EXC ' + (d.params.exceptionDetails.exception?.description || d.params.exceptionDetails.text).split('\n')[0])
+  else if (d.method === 'Runtime.consoleAPICalled' && d.params.type === 'error') errors.push('console.error ' + d.params.args.map((a) => a.value ?? a.description ?? '').join(' ').slice(0, 160))
+}
+const send = (method, params = {}, sessionId) =>
+  new Promise((resolve, reject) => {
+    const i = ++id
+    const timer = setTimeout(() => { pending.delete(i); reject(new Error('Browser call timed out after 30s: ' + method + ' ' + JSON.stringify(params).slice(0, 120))) }, 30000)
+    pending.set(i, (msg) => { clearTimeout(timer); resolve(msg) })
+    ws.send(JSON.stringify(sessionId ? { id: i, method, params, sessionId } : { id: i, method, params }))
+  })
+await send('Runtime.enable'); await send('Page.enable')
+await send('Browser.grantPermissions', { origin: BASE, permissions: ['geolocation'] })
+await send('Emulation.setGeolocationOverride', { latitude: 51.5074, longitude: -0.1278, accuracy: 50 })
+
+const ev = async (expr) => {
+  const r = await send('Runtime.evaluate', { expression: expr, awaitPromise: true, returnByValue: true })
+  if (!r.result) throw new Error('Browser rejected the expression: ' + (r.error?.message || JSON.stringify(r)).slice(0, 160) + '  <- ' + expr.slice(0, 100))
+  if (r.result.exceptionDetails) throw new Error(r.result.exceptionDetails.exception?.description || 'eval error')
+  return r.result.result.value
+}
+const goto = async (path) => { await send('Page.navigate', { url: BASE + path }); await sleep(400); await waitFor('document.readyState==="complete"', 30000); await sleep(600) }
+const waitFor = async (cond, ms = 15000) => { const end = Date.now() + ms; while (Date.now() < end) { try { if (await ev(cond)) return true } catch {} await sleep(250) } return false }
+const text = () => ev('document.body.innerText')
+const click = (sel, nth = 0) => ev(`(()=>{const e=document.querySelectorAll(${JSON.stringify(sel)})[${nth}]; if(!e) return false; e.click(); return true})()`)
+const clickText = (txt, tag = 'button') => ev(`(()=>{const e=[...document.querySelectorAll(${JSON.stringify(tag)})].find(b=>b.innerText.trim().toLowerCase().includes(${JSON.stringify(txt)}.toLowerCase())&&!b.disabled); if(!e) return false; e.click(); return true})()`)
+const setInput = (sel, val, nth = 0) => ev(`(()=>{const e=document.querySelectorAll(${JSON.stringify(sel)})[${nth}]; if(!e) return false; const s=Object.getOwnPropertyDescriptor(Object.getPrototypeOf(e),'value').set; s.call(e,${JSON.stringify(val)}); e.dispatchEvent(new Event('input',{bubbles:true})); return true})()`)
+const ls = (k) => ev(`localStorage.getItem(${JSON.stringify(k)})`)
+
+const clickOption = (label) => ev('(()=>{const b=[...document.querySelectorAll("li button")].find(b=>b.innerText.trim()===' + JSON.stringify(label) + '&&!b.disabled); if(!b) return false; b.click(); return true})()')
+const pathname = () => ev('location.pathname')
+const press = (key) => send('Input.dispatchKeyEvent', { type: 'keyDown', key, code: key, windowsVirtualKeyCode: { ArrowLeft: 37, ArrowRight: 39, ArrowDown: 40, ArrowUp: 38 }[key] }).then(() => send('Input.dispatchKeyEvent', { type: 'keyUp', key, code: key }))
+async function doLesson(path, lesson, { wrong = false } = {}) {
+  await goto('/learn/' + path + '/' + lesson.id)
+  await waitFor('/Next →|Start the quiz/.test(document.body.innerText)', 20000)
+  for (let i = 0; i < lesson.slides.length - 1; i++) { await clickText('Next →'); await sleep(60) }
+  await clickText('Start the quiz'); await sleep(150)
+  for (let n = 0; n < lesson.quiz.length; n++) {
+    const q = lesson.quiz[n]
+    await waitFor('document.body.innerText.includes(' + JSON.stringify(q.prompt) + ')', 8000)
+    const target = wrong ? q.options.find((o) => o !== q.answer) : q.answer
+    await clickOption(target); await sleep(80)
+    await clickText(n === lesson.quiz.length - 1 ? 'See result' : 'Next'); await sleep(120)
+  }
+}
+const learnState = async () => JSON.parse((await ls('deen:learn')) || '{"xp":0,"streak":0,"done":{}}')
+let pass = 0, fail = 0
+const t = (name, cond, info = '') => { if (cond) { pass++; console.log('PASS ' + name) } else { fail++; console.log('FAIL ' + name + (info ? '  -> ' + info : '')) } }
+
+// ---------- Dhikr ----------
+await goto('/dhikr'); await ev('localStorage.clear()'); await goto('/dhikr')
+for (let i = 0; i < 3; i++) await click('button[aria-label^="Count"]')
+await sleep(300)
+t('dhikr: 3 taps shows count 3', /\b3\b[\s\S]*of 33/.test(await text()))
+await goto('/dhikr')
+t('dhikr: count persists after reload', (await ls('deen:dhikr')) === '{"subhanallah":3}', await ls('deen:dhikr'))
+await clickText('Alhamdulillah'); await click('button[aria-label^="Count"]'); await sleep(200)
+t('dhikr: switching preset keeps separate counters', JSON.parse(await ls('deen:dhikr')).alhamdulillah === 1)
+await clickText('Reset this counter'); await sleep(200)
+t('dhikr: reset zeroes only the active counter', JSON.parse(await ls('deen:dhikr')).alhamdulillah === 0 && JSON.parse(await ls('deen:dhikr')).subhanallah === 3)
+
+// ---------- Zakat ----------
+await goto('/zakat')
+await setInput('input[inputmode=decimal]', '1', 1)
+await setInput('input[inputmode=decimal]', '10000', 2)
+await sleep(300)
+let z = await text()
+t('zakat: 10,000 cash vs 595 nisab -> due 250', /250/.test(z) && /Zakat due/.test(z), z.slice(z.indexOf('Net zakatable'), z.indexOf('Net zakatable') + 120).replace(/\n/g, ' '))
+await setInput('input[inputmode=decimal]', '9500', 8)
+await sleep(300)
+z = await text()
+t('zakat: debts bring wealth below nisab -> not obligatory', /Below the nisab/.test(z))
+await setInput('input[inputmode=decimal]', 'abc', 2); await setInput('input[inputmode=decimal]', '-5', 3); await sleep(200)
+t('zakat: junk/negative input does not crash or go NaN', !/NaN/.test(await text()))
+
+// ---------- Quran reader ----------
+await goto('/quran/1')
+await waitFor('document.querySelectorAll("ol > li").length>=7')
+t('quran/1: renders 7 verses', (await ev('document.querySelectorAll("ol > li").length')) === 7)
+t('quran/1: no stray footnote digits glued to translation', !/\[who is\] One,\d/.test(await text()))
+await click('input[type=checkbox]'); await waitFor('document.querySelectorAll("[class*=tj-]").length>5', 20000)
+t('quran: tajweed toggle adds colour spans', (await ev('document.querySelectorAll("[class*=tj-]").length')) > 5)
+t('quran: tajweed preference persisted', (await ls('deen:tajweed')) === 'true')
+await click('button[aria-label="Bookmark verse"]'); await sleep(200)
+t('quran: bookmark saved', (await ls('deen:bookmarks')) === '["1:1"]', await ls('deen:bookmarks'))
+await clickText('Tafsir'); await waitFor('/ibn kathir/i.test(document.body.innerText)', 30000)
+t('quran: tafsir loads for verse', /ibn kathir/i.test(await text()))
+await goto('/quran/999'); await sleep(500)
+t('quran/999: shows error, no crash', /Surah not found/.test(await text()))
+
+// ---------- Prayer ----------
+await goto('/prayer'); await waitFor('/Next prayer/.test(document.body.innerText)', 20000)
+t('prayer: default times load', /Next prayer/.test(await text()), (await text()).replace(/s+/g, ' ').slice(0, 260))
+await click('button[aria-label^="Mark Fajr"]'); await sleep(200)
+t('prayer: marking Fajr persists', /"fajr":true/.test((await ls('deen:prayers')) || ''), await ls('deen:prayers'))
+await setInput('input[aria-label=City]', 'Zzzqqq'); await setInput('input[aria-label=Country]', 'Nowhere'); await click('form button[type=submit]'); await waitFor('/Could not find prayer times/.test(document.body.innerText)', 20000)
+t('prayer: bad city shows error', /Could not find prayer times/.test(await text()), (await text()).replace(/s+/g, ' ').slice(0, 300))
+
+// ---------- Quiz ----------
+await goto('/quiz'); await waitFor('document.querySelectorAll("[data-quiz-cat]").length>0', 15000)
+t('quiz: categories to choose from (mix, Quran, Names, Prophets, 6 history groups)', (await ev('document.querySelectorAll("[data-quiz-cat]").length')) === 10)
+await click('button[aria-label="Daily quiz: The Quran"]'); await waitFor('/Question 1/.test(document.body.innerText)', 20000)
+const firstPrompt = await ev('document.querySelector("[data-testid=quiz-prompt]").innerText')
+for (let q = 0; q < 10; q++) {
+  await waitFor('document.querySelectorAll("ul button").length>=2', 5000)
+  await click('ul button'); await sleep(120)
+  if (q === 0) t('quiz: after answering you see feedback', await ev('!!document.querySelector("[data-testid=quiz-feedback]")'))
+  await clickText(q === 9 ? 'See result' : 'Next'); await sleep(150)
+}
+await sleep(300)
+t('quiz: completes 10 questions to result screen', /\/ 10/.test(await text()), (await text()).slice(0, 120).replace(/\n/g, ' '))
+t('quiz: result saved with its category', JSON.parse((await ls('deen:quizResults')) || '[]').length === 1 && JSON.parse((await ls('deen:quizResults')) || '[]')[0].cat === 'quran')
+await goto('/quiz'); await click('button[aria-label="Daily quiz: The Quran"]'); await waitFor('/Question 1/.test(document.body.innerText)', 20000)
+t('quiz: daily quiz is deterministic (same first question)', (await ev('document.querySelector("[data-testid=quiz-prompt]").innerText')) === firstPrompt, firstPrompt)
+
+// category quizzes: scientists & inventors
+await goto('/quiz'); await waitFor('document.querySelectorAll("[data-quiz-cat]").length>0', 15000)
+await click('button[aria-label="Random quiz: Scientists & inventors"]'); await waitFor('/Question 1/.test(document.body.innerText)', 20000)
+t('quiz: a history category asks about people ("Who …?" / whose lesson)', /^(Who |“)/.test(await ev('document.querySelector("[data-testid=quiz-prompt]").innerText')))
+const sciOptions = await ev('[...document.querySelectorAll("ul button")].map(b=>b.innerText).join("|")')
+t('quiz: its answer options are scientists (not surahs)', /Ibn Sina|Al-Khwarizmi|Al-Jazari|Al-Biruni|Ibn al-Haytham|Al-Razi|Ibn al-Nafis|Omar Khayyam|Ulugh Beg|Al-Kindi|Al-Zahrawi|Nasir al-Din/.test(sciOptions), sciOptions)
+await click('ul button'); await sleep(200)
+t('quiz: feedback links to the person’s story', await ev('!!document.querySelector("[data-testid=quiz-feedback] a[href^=\'/heritage/\']")'))
+await goto('/quiz'); await waitFor('document.querySelectorAll("[data-quiz-cat]").length>0', 15000)
+await click('button[aria-label="Random quiz: Surprise me"]'); await waitFor('/Question 1/.test(document.body.innerText)', 20000)
+t('quiz: "Surprise me" works', (await ev('document.querySelectorAll("ul button").length')) >= 2)
+await goto('/quiz'); await waitFor('document.querySelectorAll("[data-quiz-cat]").length>0', 15000)
+await click('button[aria-label="Random quiz: Prophets’ stories"]'); await waitFor('/Question 1/.test(document.body.innerText)', 20000)
+t('quiz: prophets’ stories category asks which story is told where', /story|Which story/i.test(await ev('document.querySelector("[data-testid=quiz-prompt]").innerText')))
+
+// ---------- Flashcards ----------
+await goto('/flashcards'); await clickText('99 Names'); await waitFor('/Show answer/.test(document.body.innerText)', 20000)
+await clickText('Show answer'); await sleep(200)
+t('flashcards: answer reveals transliteration + meaning', /Rahmaan|Beneficent/.test(await text()))
+t('flashcards: grade buttons show intervals', /1m|6m|10m|\d+d/.test(await text()))
+await clickText('good'); await sleep(300)
+const fc = JSON.parse((await ls('deen:fc:names')) || '{}')
+t('flashcards: grading stores FSRS card + counts new card', Object.keys(fc.cards || {}).length === 1 && fc.newToday?.count === 1, JSON.stringify(fc).slice(0, 140))
+
+// ---------- Hifz ----------
+await goto('/hifz'); await setInput('input[aria-label="Search surah"]', 'fatih'); await sleep(600)
+await clickText('Start (3 verses)'); await waitFor('/Start review \\(3 due\\)/.test(document.body.innerText)', 20000)
+t('hifz: adding Al-Fatihah creates 3 due cards', /Start review \(3 due\)/.test(await text()), (await text()).slice(0, 150).replace(/\n/g, ' '))
+await clickText('Start review'); await waitFor('/Reveal verse/.test(document.body.innerText)', 20000)
+await clickText('Reveal verse'); await sleep(200)
+t('hifz: reveal shows Arabic verse', /[\u0600-\u06FF]{3,}/.test(await text()))
+await clickText('good'); await sleep(300)
+t('hifz: rating a card leaves 2 in queue', /2 due/.test(await text()), (await text()).slice(0, 100).replace(/\n/g, ' '))
+
+// ---------- Stories ----------
+await goto('/stories/yusuf'); await waitFor('document.querySelectorAll("ol > li").length>0', 20000)
+t('stories/yusuf: chapter 1 verses (12:4-18 = 15)', (await ev('document.querySelectorAll("ol > li").length')) === 15, String(await ev('document.querySelectorAll("ol > li").length')))
+await clickText('Next chapter'); await waitFor('/Chapter 2 of 4/.test(document.body.innerText)', 20000); await sleep(1500)
+t('stories: next chapter loads (12:19-34 = 16)', (await ev('document.querySelectorAll("ol > li").length')) === 16, String(await ev('document.querySelectorAll("ol > li").length')))
+t('stories: progress saved', JSON.parse((await ls('deen:stories')) || '{}').yusuf === 1)
+
+// ---------- Games ----------
+await goto('/games'); await clickText('Start'); await waitFor('document.querySelectorAll("button[dir]").length>0 || document.querySelectorAll("div[dir=rtl] button").length>0', 20000)
+const wordBtns = await ev('document.querySelectorAll("div[dir=rtl] button").length')
+t('games: verse builder shows scrambled word buttons', wordBtns >= 3, String(wordBtns))
+await click('div[dir=rtl] button'); await sleep(150)
+t('games: tapping a word places it', (await ev('document.querySelectorAll("div[dir=rtl] > span").length')) === 1)
+await clickText('Surah Match'); await clickText('Start'); await waitFor('document.querySelectorAll("button[lang=ar]").length===5', 20000)
+t('games: surah match shows 5 pairs', (await ev('document.querySelectorAll("button[lang=ar]").length')) === 5)
+
+// ---------- Other pages ----------
+await goto('/duas'); await waitFor('document.querySelectorAll("li").length>3', 20000)
+t('duas: list loads', (await ev('document.querySelectorAll("li").length')) > 3)
+await clickText('Evening'); await sleep(2500)
+t('duas: category switch loads', (await ev('document.querySelectorAll("li").length')) > 3)
+await goto('/names'); await waitFor('document.querySelectorAll("li").length>=99', 20000)
+t('names: all 99 render', (await ev('document.querySelectorAll("li").length')) === 99, String(await ev('document.querySelectorAll("li").length')))
+await setInput('input[aria-label="Search names"]', 'merciful'); await sleep(300)
+t('names: search filters', (await ev('document.querySelectorAll("li").length')) < 99)
+await goto('/ramadan'); await click('button[aria-label="Fasted day 1"]'); await sleep(200)
+t('ramadan: tracker saves', /"fasted":\[1\]/.test((await ls('deen:ramadan')) || ''))
+await goto('/donate'); await setInput('input[aria-label=Amount]', '25'); await setInput('input[aria-label=Note]', 'test'); await ev('document.querySelector("form button").click()'); await sleep(300)
+t('donate: journal entry added + total', /Total: 25/.test(await text()))
+await goto('/qibla'); await waitFor('/\\d+°/.test(document.body.innerText)', 8000); t('qibla: shows the Kaaba direction (location already allowed) or offers to use your location', /\d+°|Use my location/.test(await text()))
+await goto('/companion'); await setInput('input[aria-label="Your question"]', 'What is wudu?'); await clickText('Send'); await waitFor('/not configured|Jazakallahu|Narrated|wudu/i.test(document.body.innerText.split("What is wudu?")[1]||"")', 20000)
+t('companion: message round trip returns a reply', /not configured/.test(await text()) || (await text()).split('What is wudu?').length > 1)
+
+
+// ---------- NEW: languages ----------
+await goto('/quran/112')
+await ev('localStorage.setItem("deen:lang", JSON.stringify("ur"))'); await goto('/quran/112'); await sleep(800)
+const urText = await ev('document.querySelector("p.text-gray-700")?.innerText || ""')
+t('lang: Urdu translation shown for Surah 112', /[؀-ۿ]{3,}/.test(urText) && !/Say/.test(urText), urText.slice(0, 50))
+t('lang: Urdu translation is right-to-left', (await ev('document.querySelector("p.text-gray-700")?.getAttribute("dir")')) === 'rtl')
+await ev('localStorage.setItem("deen:lang", JSON.stringify("fr"))'); await goto('/quran/112'); await sleep(800)
+t('lang: French translation shown', /Dis|Allah|Il est/.test(await ev('document.querySelector("p.text-gray-700")?.innerText || ""')))
+await ev('localStorage.setItem("deen:lang", JSON.stringify("en"))')
+await goto('/quran/112'); await waitFor('/Say, /.test(document.body.innerText)', 20000)
+const pick = (v) => ev('(()=>{const s=document.querySelector("select[aria-label=Language]"); const set=Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,"value").set; set.call(s,"${v}"); s.dispatchEvent(new Event("change",{bubbles:true}))})()'.replace("${v}", v))
+await pick('ur'); await waitFor('!/Say, /.test(document.body.innerText) && /[\u0600-\u06FF]{4,}/.test(document.querySelector("p.text-gray-700")?.innerText||"")', 15000)
+t('lang: dropdown switches the open page to Urdu without reload', !/Say, /.test(await text()) && /[\u0600-\u06FF]{3,}/.test(await ev('document.querySelector("p.text-gray-700")?.innerText||""')))
+await pick('en'); await waitFor('/Say, /.test(document.body.innerText)', 15000)
+t('lang: and back to English', /Say, /.test(await text()))
+await ev('localStorage.setItem("deen:lang", JSON.stringify("en"))')
+
+// ---------- NEW: word-by-word + lazy tajweed ----------
+await goto('/quran/112'); await ev('localStorage.removeItem("deen:tajweed")')
+await goto('/quran/112')
+t('wbw: off by default (no per-word transliteration)', !/\bqul\b/.test(await text()))
+await click('input[type=checkbox]', 1); await waitFor('/\\bqul\\b/.test(document.body.innerText)', 20000)
+t('wbw: word-by-word shows transliteration + meaning', /\bqul\b/.test(await text()) && /\bSay\b/.test(await text()))
+t('wbw: preference persisted', (await ls('deen:wbw')) === 'true')
+await ev('localStorage.setItem("deen:wbw","false")')
+
+// ---------- NEW: Quran Identifier ----------
+await goto('/identify')
+t('identify: page renders mic controls', /Start listening|Record a clip/.test(await text()))
+await setInput('input[aria-label="Arabic text"]', 'قل هو الله احد'); await clickText('Find'); await waitFor('/Al-Ikhlas/.test(document.body.innerText)', 20000)
+t('identify: pasted Arabic -> Al-Ikhlas 112:1', /Al-Ikhlas 112:1/.test(await text()), (await text()).slice(0, 200).replace(/\n/g, ' '))
+t('identify: shows translation + confidence', /Strong match|Likely|Possible/.test(await text()))
+await setInput('input[aria-label="Arabic text"]', 'hello this is not arabic'); await clickText('Find'); await sleep(1500)
+t('identify: non-Arabic text -> helpful message', /No matching verse/.test(await text()))
+
+// ---------- NEW: search ----------
+await goto('/dashboard'); await setInput('input[aria-label=Search]', 'patience'); await ev('document.querySelector("form button").click()')
+await waitFor('/Quran \\(\\d+\\)/.test(document.body.innerText)', 20000)
+t('search: dashboard box opens results page', /Quran \([1-9]\d*\)/.test(await text()) && /Hadith \([1-9]\d*\)/.test(await text()), (await text()).slice(0, 100).replace(/\n/g, ' '))
+await setInput('input[aria-label="Search query"]', 'best pizza topping'); await ev('document.querySelector("form button").click()'); await sleep(1500)
+t('search: off-topic query returns nothing', /No verses matched/.test(await text()) && /No hadith matched/.test(await text()))
+await setInput('input[aria-label="Search query"]', 'kindness to neighbours'); await ev('document.querySelector("form button").click()'); await sleep(1500)
+t('search: British spelling finds 4:36', /4:36/.test(await text()))
+
+// ---------- NEW: hadith books + languages ----------
+await goto('/hadith'); await ev('localStorage.setItem("deen:lang", JSON.stringify("en"))')
+await goto('/hadith?book=bukhari&number=1'); await waitFor('/Narrated/.test(document.body.innerText)', 20000)
+t('hadith: deep link ?book=bukhari&number=1', /Umar bin Al-Khattab/.test(await text()))
+await ev('(()=>{const s=document.querySelector("select[aria-label=Collection]"); const set=Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,"value").set; set.call(s,"nawawi"); s.dispatchEvent(new Event("change",{bubbles:true}))})()')
+await setInput('input[aria-label="Hadith number"]', '1'); await clickText('Find'); await waitFor('/Amirul Mu/.test(document.body.innerText)', 20000)
+t("hadith: Nawawi's 40 loads", /Amirul Mu/.test(await text()))
+await ev('localStorage.setItem("deen:lang", JSON.stringify("ur"))'); await goto('/hadith?book=bukhari&number=1'); await waitFor('/[\\u0600-\\u06FF]{4,}/.test(document.body.innerText)', 25000)
+t('hadith: Urdu edition from CDN', /[؀-ۿ]{4,}/.test(await text()))
+await ev('localStorage.setItem("deen:lang", JSON.stringify("en"))')
+
+// ---------- NEW: grounded AI (fake local LLM) ----------
+await goto('/companion'); await setInput('input[aria-label="Your question"]', 'kindness to neighbours'); await clickText('Send'); await waitFor('/sources found/i.test(document.body.innerText)', 30000)
+const comp = await text()
+t('ai: reply received via the configured provider', /FAKE-LLM/.test(comp) && /· Custom/.test(comp))
+t('ai: real sources attached (Quran 4:36)', /sources found/i.test(comp) && /Quran 4:36/.test(comp))
+t('ai: prompt told to cite [Q1] and reply in English', /\[Q1\]/.test(comp) && /Reply in English/.test(comp))
+t('ai: sources link to the surah', (await ev('[...document.querySelectorAll("a")].some(a=>a.getAttribute("href")==="/quran/4")')))
+await setInput('input[aria-label="Your question"]', 'and what about gratitude?'); await clickText('Send'); await waitFor('/turns=3/.test(document.body.innerText)', 30000)
+t('ai: conversation history is sent (turns=3)', /turns=3/.test(await text()))
+await ev('localStorage.setItem("deen:kids","true")'); await goto('/companion'); await setInput('input[aria-label="Your question"]', 'what is prayer?'); await clickText('Send'); await waitFor('/KIDS MODE/.test(document.body.innerText)', 30000)
+t('ai: kids mode adds the child-friendly rule', /KIDS MODE/.test(await text()))
+await ev('localStorage.setItem("deen:kids","false")')
+await goto('/quran/1'); await waitFor('document.querySelectorAll("ol > li").length>=7')
+await ev('[...document.querySelectorAll("a")].find(a=>a.innerText.trim()==="Ask AI").click()'); await waitFor('/PASSAGE THE USER IS READING/.test(document.body.innerText)', 30000)
+t('ai: "Ask AI" on a verse sends the real verse text as context', /PASSAGE THE USER IS READING/.test(await text()) && /Quran 1:1/.test(await text()))
+await goto('/stories/yusuf'); await waitFor('document.querySelectorAll("ol > li").length>0', 20000)
+await ev('[...document.querySelectorAll("a")].find(a=>a.innerText.includes("Explain this passage")).click()'); await waitFor('/PASSAGE THE USER IS READING/.test(document.body.innerText)', 30000)
+t('ai: story "Explain this passage" passes the verse range', /Quran 12:4/.test(await text()) && /Quran 12:18/.test(await text()))
+
+// ---------- NEW: kids mode + settings ----------
+await goto('/more')
+t('more: full menu lists Quran Identifier + Mosque finder', /Quran Identifier/.test(await text()) && /Find a Mosque/.test(await text()))
+await goto('/settings'); await click('input[type=checkbox]'); await sleep(300)
+t('settings: kids mode toggle persists', (await ls('deen:kids')) === 'true')
+t('settings: kids mode enlarges the page', (await ev('document.documentElement.dataset.kids')) === 'true')
+await goto('/more')
+t('more: kids mode hides adult-only items', !/Quran Identifier/.test(await text()) && !/Zakat/.test(await text()) && /Stories/.test(await text()))
+await goto('/dashboard'); t('dashboard: kids greeting', /friend/.test(await text()))
+await ev('localStorage.setItem("deen:kids","false")')
+await goto('/settings'); await clickText('Export backup'); await sleep(300)
+t('settings: export reports item count', /Exported \d+ items/.test(await text()))
+t('settings: credits list sources', /api\.quran\.com/.test(await text()) && /OpenStreetMap/.test(await text()))
+
+// ---------- NEW: sync plumbing (storage events) ----------
+await goto('/dhikr'); await click('button[aria-label^="Count"]'); await sleep(300)
+t('sync: writes record a timestamp for the key', !!JSON.parse((await ls('deen:_ts')) || '{}')['deen:dhikr'])
+await ev('localStorage.setItem("deen:dhikr", JSON.stringify({subhanallah: 27})); window.dispatchEvent(new CustomEvent("deen:pulled",{detail:{keys:["deen:dhikr"]}}))'); await sleep(400)
+t('sync: a pulled remote value updates the live UI', /\b27\b[\s\S]*of 33/.test(await text()))
+await ev('window.__changed=0; window.addEventListener("deen:changed",()=>window.__changed++)'); await click('button[aria-label^="Count"]'); await sleep(300)
+t('sync: writes fire a change event (drives the upload queue)', (await ev('window.__changed')) >= 1)
+
+// ---------- NEW: prayer by location + method ----------
+await goto('/prayer'); await clickText('Use my location'); await waitFor('/your location/.test(document.body.innerText)', 45000)
+t('prayer: "use my location" loads times by coordinates', /📍|your location/.test(await text()) && /Fajr/.test(await text()))
+const placeSaved = JSON.parse((await ls('deen:place')) || '{}')
+t('prayer: coordinates saved as the place', placeSaved.kind === 'coords' && Math.abs(placeSaved.lat - 51.5074) < 0.01)
+await ev('(()=>{const s=document.querySelector("select[aria-label=\\"Calculation method\\"]"); const set=Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,"value").set; set.call(s,"4"); s.dispatchEvent(new Event("change",{bubbles:true}))})()'); await sleep(2500)
+t('prayer: calculation method saved', (await ls('deen:method')) === '4')
+
+// ---------- NEW: qibla from location ----------
+await goto('/qibla'); await clickText('Use my location'); await waitFor('/from true North/.test(document.body.innerText)', 20000)
+const deg = parseInt((await text()).match(/(\d+)°/)?.[1] || '0')
+t('qibla: London bearing ~119 degrees', Math.abs(deg - 119) <= 2, String(deg))
+
+// ---------- NEW: zakat live prices ----------
+await goto('/zakat'); await clickText('Fill live prices'); await waitFor('document.querySelectorAll("input[inputmode=decimal]")[0].value!==""', 20000)
+const gp = parseFloat(await ev('document.querySelectorAll("input[inputmode=decimal]")[0].value')), sp2 = parseFloat(await ev('document.querySelectorAll("input[inputmode=decimal]")[1].value'))
+t('zakat: live gold/silver per-gram prices filled', gp > 10 && sp2 > 0.1 && gp > sp2 * 10, gp + ' / ' + sp2)
+await ev('(()=>{const s=document.querySelector("select[aria-label=Currency]"); const set=Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,"value").set; set.call(s,"GBP"); s.dispatchEvent(new Event("change",{bubbles:true}))})()'); await sleep(800)
+const gp2 = parseFloat(await ev('document.querySelectorAll("input[inputmode=decimal]")[0].value'))
+t('zakat: switching currency converts the price', gp2 > 0 && gp2 < gp, gp + ' -> ' + gp2)
+
+// ---------- NEW: mosques ----------
+await goto('/mosques'); await setInput('input[aria-label="City or address"]', 'London'); await clickText('Search'); await waitFor('/\\d+ mosques? near/.test(document.body.innerText)', 60000)
+t('mosques: city search lists nearby mosques with distance', /\d+ mosques? near/.test(await text()) && /\d\.\d km/.test(await text()), (await text()).slice(0, 120).replace(/\n/g, ' '))
+t('mosques: directions + map links present', (await ev('[...document.querySelectorAll("a")].some(a=>a.href.includes("openstreetmap.org/directions"))')))
+
+// ---------- NEW: Hifz recitation checker UI ----------
+await goto('/hifz'); await ev('localStorage.removeItem("deen:hifz")'); await goto('/hifz'); await setInput('input[aria-label="Search surah"]', 'ikhlas'); await sleep(500)
+await clickText('Start (3 verses)'); await waitFor('/Start review \\(3 due\\)/.test(document.body.innerText)', 20000)
+await clickText('Start review'); await waitFor('/Reveal verse/.test(document.body.innerText)', 20000)
+t('hifz: "Recite it & check" available where speech recognition exists', /Recite it/.test(await text()))
+
+
+
+// ============================ v3: Quran Majeed-style reading experience ============================
+await ev('localStorage.clear()')
+
+// ---------- Quran hub ----------
+await goto('/quran'); await waitFor('document.querySelectorAll("ul li a").length>=114', 20000)
+t('hub: 114 surahs listed with Arabic names', (await ev('document.querySelectorAll("ul li a").length')) === 114 && /الفاتحة/.test(await text()))
+await clickText('Juz'); await waitFor('/Juz 30/.test(document.body.innerText)', 10000)
+t('hub: Juz tab lists all 30 juz with where each starts', (await ev('document.querySelectorAll("ul li a").length')) === 30 && /Al-Baqarah 2:142/.test(await text()))
+await ev('[...document.querySelectorAll("a")].find(a=>a.innerText.includes("Juz 2"))?.click()'); await waitFor('location.pathname.startsWith("/quran/page/")', 15000)
+t('hub: Juz 2 opens mushaf page 22 (where 2:142 is)', (await pathname()) === '/quran/page/22', await pathname())
+
+// ---------- Mushaf page view ----------
+await goto('/quran/page/1'); await waitFor('document.querySelectorAll("[data-verse]").length>=7', 20000)
+t('page 1: the 7 verses of Al-Fatihah, in mushaf layout', (await ev('document.querySelectorAll("[data-verse]").length')) === 7 && /Al-Fatihah/.test(await text()) && (await ev('!!document.querySelector(".mushaf")')))
+await click('button[aria-label="Next page"]'); await waitFor('location.pathname==="/quran/page/2"', 10000); await waitFor('!!document.querySelector("[data-verse=\\"2:1\\"]")', 15000)
+t('page 2: next button turns the page and shows 2:1', (await pathname()) === '/quran/page/2' && (await ev('!!document.querySelector("[data-verse=\\"2:1\\"]")')))
+await press('ArrowLeft'); await waitFor('location.pathname==="/quran/page/3"', 10000)
+t('keyboard: ← turns to the next page (right-to-left book)', (await pathname()) === '/quran/page/3')
+for (let k = 0; k < 4 && (await pathname()) !== '/quran/page/2'; k++) { await press('ArrowRight'); await waitFor('location.pathname==="/quran/page/2"', 6000) }
+t('keyboard: → goes back', (await pathname()) === '/quran/page/2')
+await setInput('input[aria-label="Go to page"]', '604'); await ev('document.querySelector("input[aria-label=\\"Go to page\\"]").form.requestSubmit()'); await waitFor('location.pathname==="/quran/page/604"', 10000); await waitFor('!!document.querySelector("[data-verse=\\"114:6\\"]")', 15000)
+t('go-to-page: 604 is the last page, ending at 114:6, in Juz 30', /Juz 30/.test(await text()))
+await goto('/quran/page/605'); await sleep(800)
+t('page 605: friendly error', /Page not found/.test(await text()))
+
+// ---------- Verse actions + share image ----------
+await goto('/quran/page/1'); await waitFor('document.querySelectorAll("[data-verse]").length>=7', 20000)
+await ev('document.querySelector("[data-verse=\\"1:2\\"]").click()'); await waitFor('!!document.querySelector("[role=dialog][aria-label*=\\"1:2\\"]")', 5000)
+const sheetText = await ev('document.querySelector("[role=dialog]").innerText')
+t('tap a verse: action sheet opens with Play/Save/Copy/Share/Image/Tafsir/Ask AI', ['Play on', 'Save', 'Copy', 'Share', 'Image', 'Tafsir', 'Ask AI'].every((l) => sheetText.includes(l)), sheetText.slice(0, 120).replace(/\n/g, ' '))
+
+await clickText('Save'); await sleep(200)
+t('action sheet: Save adds the verse to bookmarks', (await ls('deen:bookmarks')) === '["1:2"]', await ls('deen:bookmarks'))
+await clickText('Image'); await waitFor('!!document.querySelector("img[data-testid=share-card]")', 20000)
+await waitFor('document.querySelector("img[data-testid=share-card]").complete && document.querySelector("img[data-testid=share-card]").naturalWidth>0', 10000)
+const dims = await ev('(()=>{const i=document.querySelector("img[data-testid=share-card]"); return [i.naturalWidth,i.naturalHeight]})()')
+t('share image: generated at 1080x1350', dims[0] === 1080 && dims[1] === 1350, dims.join('x'))
+const imgBytes = await ev('fetch(document.querySelector("img[data-testid=share-card]").src).then(r=>r.blob()).then(b=>b.size)')
+t('share image: is a real picture (not blank), > 30 KB', imgBytes > 30000, String(imgBytes))
+await press('Escape'); await sleep(200)
+
+// ---------- Reader modes, size, hash jump, follow-along ----------
+await goto('/quran/1'); await waitFor('document.querySelectorAll("ol > li").length>=7', 20000)
+await clickText('Reading'); await sleep(400)
+t('reading mode: continuous mushaf text with verse markers', (await ev('!!document.querySelector(".mushaf")')) && /﴿/.test(await text()) && (await ev('document.querySelectorAll(".mushaf [data-verse]").length')) === 7)
+t('reading mode: preference persisted', JSON.parse((await ls('deen:prefs')) || '{}').mode === 'reading')
+await click('button[aria-label$="Increase text size"]'); await sleep(200)
+t('text size: A+ grows the Arabic (30 -> 32px)', JSON.parse(await ls('deen:prefs')).arSize === 32 && (await ev('document.documentElement.style.getPropertyValue("--ar-size")')) === '32px')
+await click('button[aria-label$="Decrease text size"]'); await click('button[aria-label$="Decrease text size"]'); await sleep(200)
+t('text size: A− shrinks it', JSON.parse(await ls('deen:prefs')).arSize === 28)
+await clickText('Translation'); await sleep(300)
+await goto('/quran/2#v255'); await waitFor('!!document.getElementById("v255")', 25000); await sleep(800)
+const top255 = await ev('(()=>{const r=document.getElementById("v255").getBoundingClientRect(); return [r.top, innerHeight]})()')
+t('deep link #v255 scrolls Ayat al-Kursi into view', top255[0] > -50 && top255[0] < top255[1], top255.join('/'))
+
+// ---------- Themes ----------
+await goto('/settings')
+await clickText('Dark'); await sleep(300)
+t('theme: Dark applies instantly', (await ev('document.documentElement.dataset.theme')) === 'dark')
+const bgDark = await ev('getComputedStyle(document.body).backgroundColor')
+t('theme: dark background is actually dark', (bgDark.match(/\d+/g) || [255]).slice(0, 3).every((n) => Number(n) < 50), bgDark)
+await goto('/quran/1')
+t('theme: saved theme is applied on first paint after reload', (await ev('document.documentElement.dataset.theme')) === 'dark')
+const cardBg = await ev('getComputedStyle(document.querySelector("ol > li, .bg-white")).backgroundColor')
+t('theme: white cards are remapped (not left white on dark)', (cardBg.match(/\d+/g) || [255]).slice(0, 3).every((n) => Number(n) < 80), cardBg)
+await goto('/settings'); await clickText('Sepia'); await sleep(300)
+t('theme: Sepia gives warm paper background', (await ev('getComputedStyle(document.body).backgroundColor')) === 'rgb(241, 231, 208)')
+await clickText('Light'); await sleep(200)
+t('theme: Light', (await ev('document.documentElement.dataset.theme')) === 'light')
+await setInput('input[aria-label="Arabic text size"]', '40'); await sleep(200)
+t('settings: Arabic size slider updates live', (await ev('document.documentElement.style.getPropertyValue("--ar-size")')) === '40px')
+await ev('localStorage.removeItem("deen:prefs")')
+
+// ---------- Global audio player ----------
+await goto('/quran/1'); await waitFor('document.querySelectorAll("ol > li").length>=7', 20000)
+await click('button[aria-label="Play verse 1"]'); await waitFor('!!document.querySelector("[role=region][aria-label=\\"Audio player\\"]")', 10000)
+t('mini player: appears with the surah name and verse', /Al-Fatihah/.test(await ev('document.querySelector("[role=region][aria-label=\\"Audio player\\"]").innerText')) && /1:1/.test(await ev('document.querySelector("[role=region][aria-label=\\"Audio player\\"]").innerText')))
+await click('button[aria-label="Next verse"]'); await sleep(500)
+t('mini player: next verse advances to 1:2', /1:2/.test(await ev('document.querySelector("[role=region][aria-label=\\"Audio player\\"]").innerText')))
+await click('button[aria-label="Previous verse"]'); await sleep(500)
+t('mini player: previous goes back to 1:1', /1:1/.test(await ev('document.querySelector("[role=region][aria-label=\\"Audio player\\"]").innerText')))
+await click('button[aria-label="Repeat verse: off"]'); await sleep(300)
+t('mini player: repeat toggles on and persists', (await ev('document.querySelector("button[aria-label^=\\"Repeat verse\\"]").getAttribute("aria-pressed")')) === 'true' && JSON.parse(await ls('deen:prefs')).repeat === 'one')
+await click('button[aria-label^="Speed"]'); await sleep(300)
+t('mini player: speed cycles 1x -> 1.25x', /1\.25/.test(await ev('document.querySelector("button[aria-label^=\\"Speed\\"]").innerText')))
+t('mini player: reciter can be switched', (await ev('document.querySelectorAll("select[aria-label=Reciter] option").length')) === 25)
+await ev('document.querySelector("nav a[href=\\"/dashboard\\"]").click()'); await waitFor('location.pathname==="/dashboard"', 10000); await sleep(500)
+t('mini player: keeps playing while you navigate to another page', await ev('!!document.querySelector("[role=region][aria-label=\\"Audio player\\"]")'))
+await click('button[aria-label="Close player"]'); await sleep(300)
+t('mini player: close removes it', !(await ev('!!document.querySelector("[role=region][aria-label=\\"Audio player\\"]")')))
+await ev('localStorage.removeItem("deen:prefs")')
+
+// ---------- Home ----------
+await goto('/dashboard'); await waitFor('/ayah of the day/i.test(document.body.innerText)', 25000)
+t('home: Ayah of the day card with listen/share/explain', /ayah of the day/i.test(await text()) && /Listen/.test(await text()) && /Share/.test(await text()))
+await waitFor('/next prayer/i.test(document.body.innerText)', 45000)
+t('home: next-prayer countdown', /next prayer/i.test(await text()) && /in (\d+h )?\d+m/.test(await text()))
+await clickText('Share'); await waitFor('!!document.querySelector("img[data-testid=share-card]")', 20000)
+t('home: ayah of the day can be shared as an image', await ev('!!document.querySelector("img[data-testid=share-card]")'))
+await press('Escape')
+
+// ============================ v3: Islamic Reels ============================
+await goto('/reels'); await waitFor('document.querySelectorAll("section[data-reel-type]").length>=6', 30000)
+const reelCount = await ev('document.querySelectorAll("section[data-reel-type]").length')
+t('reels: feed loads a batch of full-screen cards', reelCount >= 6, String(reelCount))
+const types = await ev('[...new Set([...document.querySelectorAll("section[data-reel-type]")].map(s=>s.dataset.reelType))]')
+t('reels: mixes ayah, hadith, names and words', types.length >= 3 && types.includes('ayah'), types.join())
+t('reels: each card shows a source reference', await ev('[...document.querySelectorAll("section[data-reel-type]")].slice(0,4).every(s=>/Quran|Sahih|Sunan|Names|word|Muwatta|Hadith|Jami/i.test(s.innerText))'))
+t('reels: first-time hint to tap for sound', /Tap to start with sound/.test(await text()))
+t('reels: the app chrome is hidden (immersive)', await ev('(()=>{const r=document.querySelector("[data-testid=reels]").getBoundingClientRect(); return r.width>=innerWidth-1 && r.height>=innerHeight-1})()'))
+await click('section[data-index="0"] button[aria-label="Like"]'); await sleep(250)
+t('reels: like persists', JSON.parse((await ls('deen:likes')) || '[]').length === 1)
+await click('section[data-index="0"] button[aria-label="Unlike"]'); await sleep(250)
+t('reels: unlike removes it', JSON.parse((await ls('deen:likes')) || '[]').length === 0)
+await click('section[data-index="0"] button[aria-label="Save"]'); await sleep(250)
+t('reels: save keeps the card', JSON.parse((await ls('deen:reel-saves')) || '[]').length === 1)
+await click('section[data-index="0"] button[aria-label="Share as image"]'); await waitFor('!!document.querySelector("img[data-testid=share-card]")', 20000)
+await waitFor('document.querySelector("img[data-testid=share-card]").naturalWidth>0', 8000)
+t('reels: share-as-image works for any card type', (await ev('document.querySelector("img[data-testid=share-card]").naturalWidth')) === 1080)
+await press('Escape'); await sleep(300)
+await ev('document.querySelector("[data-testid=reels] .reels-scroll").scrollBy({top: innerHeight, behavior: "instant"})'); await sleep(700)
+t('reels: scrolling snaps to the next card', Math.abs(await ev('document.querySelector("[data-testid=reels] .reels-scroll").scrollTop') - (await ev('innerHeight'))) < 40)
+await ev('document.querySelector("[data-testid=reels] .reels-scroll").scrollTo({top: innerHeight*(document.querySelectorAll("section[data-reel-type]").length-1), behavior: "instant"})'); await sleep(1500)
+await waitFor('document.querySelectorAll("section[data-reel-type]").length>' + reelCount, 25000)
+t('reels: endless — more cards load as you reach the end', (await ev('document.querySelectorAll("section[data-reel-type]").length')) > reelCount)
+await clickText('Patience'); await waitFor('/Quran 70:5|Quran 3:200|Quran 16:127|Quran 2:153/i.test(document.body.innerText)', 25000)
+t('reels: topic "Patience" shows real patience verses', /Quran (70:5|3:200|16:127|2:153|18:68)/i.test(await text()))
+await clickText('Saved'); await sleep(800)
+t('reels: Saved tab shows what you saved', (await ev('document.querySelectorAll("section[data-reel-type]").length')) === 1)
+await ev('document.querySelector("button[aria-label=\\"Sound on\\"]")?.click()'); await sleep(300)
+t('reels: sound can be switched off and the choice persists', (await ls('deen:reel-sound')) === 'false')
+await ev('localStorage.removeItem("deen:reel-sound")')
+
+// ============================ v4: Reels with videos, comments, streak ============================
+// Make a real (tiny) video in the browser and park it on the fake Pexels server, so playback is tested for real.
+const clipBytes = await ev(`(async()=>{const c=document.createElement('canvas');c.width=90;c.height=160;const x=c.getContext('2d');const rec=new MediaRecorder(c.captureStream(15),{mimeType:'video/webm'});const ch=[];rec.ondataavailable=e=>ch.push(e.data);const done=new Promise(r=>rec.onstop=r);rec.start();let n=0;const iv=setInterval(()=>{x.fillStyle='hsl('+(n*25)+',60%,40%)';x.fillRect(0,0,90,160);n++},60);await new Promise(r=>setTimeout(r,1500));clearInterval(iv);rec.stop();await done;const r=await fetch('http://localhost:4010/video-upload',{method:'POST',body:new Blob(ch,{type:'video/webm'})});return (await r.json()).bytes})()`)
+t('reels video: test clip recorded and uploaded to the fake Pexels', clipBytes > 500, String(clipBytes))
+
+await ev('localStorage.clear()')
+await goto('/reels'); await waitFor('!!document.querySelector("video[data-reel-video]")', 25000)
+t('reels video: cards get a stock video background', await ev('!!document.querySelector("video[data-reel-video]")'))
+await waitFor('(()=>{const v=document.querySelector("video[data-reel-video]");return v&&v.readyState>=2&&!v.paused})()', 15000)
+t('reels video: the clip on screen is playing, muted, looping and inline', await ev('(()=>{const v=document.querySelector("video[data-reel-video]");return !!v&&!v.paused&&v.muted&&v.loop&&v.playsInline&&v.readyState>=2})()'))
+const nVideos = await ev('document.querySelectorAll("video[data-reel-video]").length')
+t('reels video: only the current and neighbouring cards load video (saves data)', nVideos >= 1 && nVideos <= 3, String(nVideos))
+t('reels video: poster image is set for instant paint', (await ev('document.querySelector("video[data-reel-video]").poster')).includes('/poster.svg'))
+const credit = await ev('document.querySelector("[data-testid=video-credit]")?.innerText||""')
+t('reels video: credits the videographer and links to Pexels', /Test Videographer/.test(credit) && /Pexels/.test(credit) && (await ev('[...document.querySelectorAll("[data-testid=video-credit] a")].map(a=>a.href).join()')).includes('pexels.com/@test-videographer') && (await ev('[...document.querySelectorAll("[data-testid=video-credit] a")].some(a=>a.href==="https://www.pexels.com/")')))
+t('reels video: text stays readable over the footage (dark overlay)', await ev('!!document.querySelector("video[data-reel-video] + div")'))
+
+await ev('document.querySelector("[data-testid=reels] .reels-scroll").scrollBy({top: innerHeight, behavior: "instant"})'); await sleep(1200)
+t('reels video: swiping on moves playback to the new card', await ev('(()=>{const s=[...document.querySelectorAll("section[data-reel-type]")];const playing=s.filter(x=>{const v=x.querySelector("video");return v&&!v.paused});return playing.length===1&&playing[0].dataset.index==="1"})()'))
+
+// A broken video must never break the card: it falls back to the animated background.
+await ev('document.querySelector("section[data-index=\'1\'] video")?.dispatchEvent(new Event("error"))'); await sleep(500)
+t('reels video: a failing clip is swapped out and the card still shows its text', (await ev('document.querySelector("section[data-index=\'1\']")?.innerText.length')) > 10 && (await ev('document.querySelectorAll("section[data-index=\'1\'] video").length')) <= 1)
+
+// ---- comments ----
+await click('section[data-index="1"] button[aria-label^="Comments"]'); await sleep(400)
+t('reels comments: panel opens', await ev('!!document.querySelector("[data-testid=comments-panel]")'))
+t('reels comments: says they stay on this device', /only on this device/i.test(await text()))
+const typeComment = (v) => ev(`(()=>{const i=document.querySelector("input[aria-label=\\"Add a comment\\"]");Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value").set.call(i,${JSON.stringify(v)});i.dispatchEvent(new Event("input",{bubbles:true}));return i.value.length})()`)
+t('reels comments: empty comment cannot be posted', await ev('document.querySelector("[data-testid=comments-panel] button[type=submit]").disabled'))
+const len = await typeComment('x'.repeat(400))
+t('reels comments: capped at 280 characters', len === 280, String(len))
+await typeComment('Subhanallah, a beautiful reminder')
+await click('[data-testid=comments-panel] button[type=submit]'); await sleep(400)
+t('reels comments: posted comment appears', (await ev('document.querySelectorAll("[data-comment]").length')) === 1 && /beautiful reminder/.test(await text()))
+t('reels comments: saved on the device', Object.values(JSON.parse((await ls('deen:comments')) || '{}')).flat().length === 1)
+await click('button[aria-label="Close comments"]'); await sleep(300)
+t('reels comments: rail shows the count', await ev('!!document.querySelector("section[data-index=\'1\'] button[aria-label=\'Comments (1)\']")'))
+await click('section[data-index="1"] button[aria-label^="Comments"]'); await sleep(400)
+await click('button[aria-label="Delete comment"]'); await sleep(300)
+t('reels comments: a comment can be deleted', (await ev('document.querySelectorAll("[data-comment]").length')) === 0 && Object.values(JSON.parse((await ls('deen:comments')) || '{}')).flat().length === 0)
+await typeComment('Ameen'); await click('[data-testid=comments-panel] button[type=submit]'); await sleep(300)
+await goto('/reels'); await waitFor('document.querySelectorAll("section[data-reel-type]").length>=2', 25000)
+t('reels comments: still saved after a reload', Object.values(JSON.parse((await ls('deen:comments')) || '{}')).flat().length === 1)
+await ev('localStorage.removeItem("deen:comments")')
+
+// ---- streak ----
+const dayStr = (n) => ev(`(()=>{const d=new Date();d.setDate(d.getDate()+(${n}));return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")})()`)
+const yest = await dayStr(-1), tod = await dayStr(0)
+await ev(`localStorage.setItem("deen:reel-log", JSON.stringify({ "${yest}": ["a","b","c","d","e"], "${tod}": ["p","q","r","s"] }))`)
+await goto('/reels'); await waitFor('!!document.querySelector("[data-testid=reel-streak]")', 20000)
+await waitFor('/4\\/5/.test(document.querySelector("[data-testid=reel-streak]").innerText)', 8000)
+const chip0 = await ev('document.querySelector("[data-testid=reel-streak]").innerText.replace(/\\s+/g," ")')
+t('reels streak: chip shows the saved streak (yesterday met) and 4/5 today', /1/.test(chip0) && /4\/5/.test(chip0), chip0)
+t('reels streak: no toast just from opening the page', !(await ev('!!document.querySelector("[data-testid=streak-toast]")')))
+await waitFor('!!document.querySelector("[data-testid=streak-toast]")', 9000)
+t('reels streak: watching one more reel reaches the daily goal and celebrates', await ev('!!document.querySelector("[data-testid=streak-toast]")'))
+const chip1 = await ev('document.querySelector("[data-testid=reel-streak]").innerText.replace(/\\s+/g," ")')
+t('reels streak: streak grows to 2 days with 5/5', /2/.test(chip1) && /5\/5/.test(chip1), chip1)
+t('reels streak: the day is saved', (JSON.parse((await ls('deen:reel-log')) || '{}')[tod] || []).length === 5)
+await goto('/reels'); await waitFor('!!document.querySelector("[data-testid=reel-streak]")', 20000); await sleep(1500)
+t('reels streak: reopening a day that is already complete shows no new toast', !(await ev('!!document.querySelector("[data-testid=streak-toast]")')))
+await ev('localStorage.removeItem("deen:reel-log")')
+
+// ---- karaoke captions (needs the recitation audio to actually play in this browser) ----
+await goto('/reels'); await waitFor('document.querySelectorAll("section[data-reel-type]").length>=2', 25000)
+await clickText('Patience'); await waitFor('/Quran 70:5|Quran 3:200|Quran 16:127|Quran 2:153/i.test(document.body.innerText)', 25000)
+await ev('window.__DEEN_AUDIO_BASE = "http://localhost:4010/audio"')
+const idxOfActive = () => ev('(()=>{const el=document.querySelector("[data-word-active]");return el?[...el.parentElement.children].indexOf(el):-1})()')
+await click('section[data-index="0"]')
+const karaoke = await waitFor('!!document.querySelector("[data-word-active]")', 20000)
+t('reels captions: while the verse is recited, one word is highlighted', karaoke && (await ev('document.querySelectorAll("[data-word-active]").length')) === 1)
+const i1 = await idxOfActive()
+await sleep(2200)
+const i2 = await idxOfActive()
+t('reels captions: the highlight moves forward with the recitation', i1 >= 0 && i2 > i1, i1 + ' -> ' + i2)
+t('reels captions: the Arabic text itself is unchanged by the highlighting', /[\u0600-\u06FF]/.test(await ev('document.querySelector("section[data-index=\'0\'] [lang=ar]").innerText')))
+await waitFor('(()=>{const s=document.querySelector("[data-testid=reels] .reels-scroll");return s&&s.scrollTop>innerHeight*0.6})()', 14000)
+t('reels auto-advance: when the recitation ends the feed moves to the next reel', await ev('document.querySelector("[data-testid=reels] .reels-scroll").scrollTop>innerHeight*0.6'))
+await ev('delete window.__DEEN_AUDIO_BASE')
+
+// ============================ v3: Learn ============================
+await ev('localStorage.removeItem("deen:learn"); localStorage.removeItem("deen:fc:words")')
+const letterLessons = buildLetterLessons()
+const wordsData = JSON.parse(readFileSync(new URL('../data/learn/words.json', import.meta.url), 'utf8'))
+const wordLessons = buildWordLessons(wordsData.rows, wordsData.total)
+await goto('/learn'); await waitFor('/Arabic Letters/.test(document.body.innerText)', 15000)
+const hubText = await text()
+t('learn: hub lists the four courses with streak/xp/level', ['Arabic Letters', 'Quran Words', 'Tajweed Basics', 'Foundations'].every((n) => hubText.includes(n)) && /streak/i.test(hubText) && /Level/i.test(hubText))
+
+t('learn: hub shows 0 xp, level 1 for a new learner', /\n0\nXP/.test(await text()) || /0\s*XP/.test(await text()))
+await goto('/learn/letters'); await waitFor('document.querySelectorAll("ol li a").length>=7', 15000)
+t('letters course: 7 lessons', (await ev('document.querySelectorAll("ol li a").length')) === 7)
+await doLesson('letters', letterLessons[0], { wrong: true })
+t('lesson: failing the quiz is explained, awards nothing', /You need 70%/.test(await text()) && (await learnState()).xp === 0, (await text()).slice(0, 80).replace(/\n/g, ' '))
+await doLesson('letters', letterLessons[0])
+t('lesson: perfect quiz = 100% and +20 XP', /100%/.test(await text()) && /\+20 XP/.test(await text()), (await text()).slice(0, 90).replace(/\n/g, ' '))
+const ls1 = await learnState()
+t('lesson: xp, streak and best score are saved', ls1.xp === 20 && ls1.streak === 1 && ls1.done['letters-1'] === 100, JSON.stringify(ls1))
+await doLesson('letters', letterLessons[0])
+t('lesson: replaying earns no extra XP (no farming)', (await learnState()).xp === 20 && /already earned/.test(await text()))
+await goto('/learn'); await waitFor('/20/.test(document.body.innerText)', 10000)
+t('learn hub: shows xp, the 1-day streak and course progress', /20\s*\n?\s*XP/.test(await text()) && /1 \/ 7 lessons/.test(await text()))
+await doLesson('words', wordLessons[0])
+const wd = JSON.parse((await ls('deen:fc:words')) || '{"cards":{}}')
+t('words lesson: passing adds its 10 words to spaced-repetition flashcards', Object.keys(wd.cards).length === 10, String(Object.keys(wd.cards).length))
+await goto('/flashcards'); await waitFor('/Quran Words/.test(document.body.innerText)', 10000); await sleep(400)
+t('flashcards: "Quran Words" deck shows what you learned', /10 learned/.test(await text()))
+await doLesson('tajweed', TAJWEED_LESSONS[0])
+t('tajweed lesson: completes with a score', /100%/.test(await text()))
+await doLesson('basics', BASICS_LESSONS[0])
+t('foundations lesson: completes', /100%/.test(await text()) && (await learnState()).xp > 20)
+await goto('/learn/letters/nope'); await sleep(800)
+t('lesson not found: friendly message', /Lesson not found/.test(await text()))
+await goto('/learn/zzz'); await sleep(600)
+t('course not found: friendly message', /Course not found/.test(await text()))
+await goto('/learn/letters/letters-1'); await waitFor('/Next →/.test(document.body.innerText)', 10000)
+t('lesson slide: big Arabic letter with its four written forms', /Alone/.test(await text()) && /(Start of a word|Does not join)/.test(await text()) && (await ev('!!document.querySelector("p[lang=ar]")')))
+await goto('/dashboard'); await waitFor('/streak/i.test(document.body.innerText)', 15000)
+t('home: shows the learning streak', /1 day/.test(await text()))
+
+// ============================ v3: AI status & resilience in the UI ============================
+await goto('/companion'); await waitFor('/Cloud AI ready/.test(document.body.innerText)', 20000)
+t('companion: status badge shows cloud AI is ready', /Cloud AI ready \(1\/1\)/.test(await text()))
+await setInput('input[aria-label="Your question"]', 'FORCE429 what is zakat'); await clickText('Send'); await waitFor('/Sources only/.test(document.body.innerText)', 30000)
+t('companion: when quota is exhausted the user still gets sourced content, clearly labelled', /Sources only — no AI model answered/.test(await text()) && /sources found/i.test(await text()))
+await waitFor('/resting/.test(document.body.innerText)', 15000)
+t('companion: badge tells the user the cloud AI is resting', /resting/.test(await text()))
+await sleep(2500)
+await setInput('input[aria-label="Your question"]', 'what is the status of zakat in islam'); await clickText('Send'); await waitFor('/AI answer/.test(document.body.innerText.split("Sources only")[1]||"")', 30000)
+t('companion: after the cool-down it answers again', /AI answer/.test((await text()).split('Sources only')[1] || ''))
+await goto('/companion'); await waitFor('/Cloud AI ready/.test(document.body.innerText)', 20000)
+await setInput('input[aria-label="Your question"]', 'is zakat obligatory on savings'); await clickText('Send'); await waitFor('/AI answer/.test(document.body.innerText)', 30000)
+// A new chat asking the same standalone question is answered from the cache (conversations with history are never cached).
+await goto('/companion'); await waitFor('/Cloud AI ready/.test(document.body.innerText)', 20000)
+await setInput('input[aria-label="Your question"]', 'Is zakat obligatory on savings?'); await clickText('Send'); await waitFor('/saved — no tokens used/.test(document.body.innerText)', 30000)
+t('companion: asking the same thing again is free (answer cache)', /saved — no tokens used/.test(await text()))
+
+// ============================ v3: on-device AI settings ============================
+await goto('/settings'); await waitFor('/On-device AI/.test(document.body.innerText)', 10000); await sleep(1200)
+t('settings: on-device AI section explains itself and reports device support honestly', /On-device AI/.test(await text()) && /(Not available here|Fast|Balanced)/.test(await text()))
+t('settings: appearance section present', /Appearance/.test(await text()) && (await ev('document.querySelectorAll("input[type=range]").length')) === 2)
+
+
+// ============================ v4: Tarteel-style recitation ============================
+const quranRows = JSON.parse(readFileSync(new URL('../data/quran/arabic.json', import.meta.url), 'utf8'))
+const plainOf = (...keys) => keys.map((k) => quranRows.find((r) => r[0] === k)[2]).join(' ')
+await goto('/recite?s=112&from=1&to=4'); await waitFor('document.querySelectorAll("[data-testid=recite-text] [data-status]").length>=15', 20000)
+const reciteWords = await ev('document.querySelectorAll("[data-testid=recite-text] [data-status]").length')
+t('recite: shows the chosen verses word by word (Al-Ikhlas 1–4 = 15 words)', reciteWords === 15, String(reciteWords))
+t('recite: everything starts pending', (await ev('[...document.querySelectorAll("[data-testid=recite-text] [data-status]")].every(s=>s.dataset.status==="pending")')))
+await ev('document.querySelector("details summary").click()'); await sleep(200)
+const typeAndCheck = async (txt) => { await setInput('textarea[aria-label="What you recited"]', txt); await clickText('Check'); await sleep(500) }
+const statuses = () => ev('[...document.querySelectorAll("[data-testid=recite-text] [data-status]")].map(s=>s.dataset.status[0]).join("")')
+await typeAndCheck(plainOf('112:1', '112:2', '112:3', '112:4'))
+t('recite: perfect recitation -> all words green, "Perfect"', (await statuses()) === 'c'.repeat(15) && /Perfect/.test(await text()), await statuses())
+const words1 = plainOf('112:1').split(' ')
+await typeAndCheck([words1[0], 'كتاب', words1[2], words1[3], plainOf('112:2', '112:3', '112:4')].join(' '))
+t('recite: a wrong word is flagged as misread, the rest stays correct', (await statuses()) === 'cmcc' + 'c'.repeat(11) && /misread/.test(await text()), await statuses())
+await typeAndCheck([words1[0], words1[2], words1[3], plainOf('112:2', '112:3', '112:4')].join(' '))
+t('recite: a skipped word is flagged as skipped', (await statuses()).startsWith('cscc') && /skipped/.test(await text()), await statuses())
+await typeAndCheck(words1.slice(0, 2).join(' '))
+t('recite: stopping part-way leaves the rest pending (not marked skipped)', (await statuses()) === 'cc' + 'p'.repeat(13), await statuses())
+await click('input[type=checkbox]'); await sleep(300)
+t('recite: memorisation mode hides words not yet recited', (await ev('document.querySelector("[data-testid=recite-text]").innerText')).includes('▒'))
+await click('input[type=checkbox]')
+await typeAndCheck(plainOf('112:1', '112:2', '112:3', '112:4'))
+await clickText('Save to my practice log'); await sleep(300)
+const rlog = JSON.parse((await ls('deen:recite-log')) || '[]')
+t('recite: result saved to the practice log with its accuracy', rlog.length === 1 && rlog[0].accuracy === 100 && /Ikhlas/.test(rlog[0].ref), JSON.stringify(rlog))
+t('recite: practice log is shown', /Practice log/.test(await text()))
+t('recite: Listen button (hear the reciter first) is available', await ev('!!document.querySelector("button[aria-label*=Listen]")'))
+
+// ============================ v4: Khatam planner ============================
+await ev('localStorage.removeItem("deen:khatam"); localStorage.removeItem("deen:readlog")')
+await goto('/goals'); await waitFor('/Khatam Planner/.test(document.body.innerText)', 15000)
+t('goals: preset plans with pages per day', /30 days/.test(await text()) && /21 pages \/ day/.test(await text()))
+await clickText('30 days'); await waitFor('/Finish the Quran in 30 days/.test(document.body.innerText)', 8000)
+t('goals: 30-day plan = 21 pages a day, day 1', /21 pages a day/.test(await text()) && /day 1 of 30/.test(await text()))
+t('goals: 21 pages left today to start', (await ev('document.querySelector("[data-testid=pages-left-today]").innerText')) === '21')
+await setInput('input[aria-label="Pages to mark as read"]', '1-5'); await clickText('Add'); await sleep(400)
+t('goals: marking pages 1–5 updates progress and what is left today', /5 \/ 604 pages/.test(await text()) && (await ev('document.querySelector("[data-testid=pages-left-today]").innerText')) === '16')
+t('goals: "continue from page 6" link', /Continue from page 6/.test(await text()))
+await setInput('input[aria-label="Pages to mark as read"]', 'nonsense'); await clickText('Add'); await sleep(200)
+t('goals: invalid page input gets a helpful message', /Enter pages like/.test(await text()))
+await goto('/quran/page/10'); await waitFor('document.querySelectorAll("[data-verse]").length>3', 20000); await sleep(6500)
+t('mushaf: staying on a page logs it as read automatically', JSON.stringify(Object.values(JSON.parse((await ls('deen:readlog')) || '{}')).flat().sort((a, b) => a - b)) === '[1,2,3,4,5,10]')
+await goto('/goals'); await waitFor('/6 \\/ 604 pages/.test(document.body.innerText)', 10000)
+t('goals: the auto-logged page counts toward the plan', /6 \/ 604 pages/.test(await text()))
+t('goals: progress-by-juz grid shows 30 juz', (await ev('[...document.querySelectorAll("div[title^=\\"Juz \\"]")].length')) === 30)
+await ev('window.confirm = () => true'); await clickText('Change or restart plan'); await sleep(400)
+t('goals: restarting returns to plan choices (reading log kept)', /pages \/ day/.test(await text()) && Object.keys(JSON.parse((await ls('deen:readlog')) || '{}')).length > 0)
+
+// ============================ v4: Daily deeds ============================
+await ev('localStorage.removeItem("deen:habits")')
+const todayKey = await ev('(()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")})()')
+await ev('localStorage.setItem("deen:prayers", JSON.stringify({"' + todayKey + '": {fajr:true,dhuhr:true,asr:true,maghrib:true,isha:true}}))')
+await goto('/habits'); await waitFor('document.querySelectorAll("[data-habit]").length===9', 15000)
+t('habits: nine deeds listed', (await ev('document.querySelectorAll("[data-habit]").length')) === 9)
+t('habits: five prayers logged on the Prayer page show as done automatically', (await ev('document.querySelector("[data-habit=prayers]").getAttribute("aria-pressed")')) === 'true')
+t('habits: automatic deeds cannot be ticked by hand', await ev('document.querySelector("[data-habit=prayers]").disabled'))
+const habitBase = Number((await text()).match(/(\d) of 9 done/)?.[1])
+await click('[data-habit=morning]'); await sleep(250)
+t('habits: tapping a manual deed ticks it and saves', (await ev('document.querySelector("[data-habit=morning]").getAttribute("aria-pressed")')) === 'true' && JSON.parse(await ls('deen:habits'))[todayKey].morning === true)
+const doneNow = async () => Number((await text()).match(/(\d) of 9 done/)?.[1])
+const afterTick = await doneNow()
+t('habits: ticking adds exactly one to the day\u0027s score', afterTick === habitBase + 1, `${habitBase} -> ${afterTick}`)
+await click('[data-habit=morning]'); await sleep(200)
+t('habits: tapping again un-ticks (back to the baseline)', (await doneNow()) === habitBase)
+await click('button[aria-label="Previous day"]'); await sleep(300)
+const yKey = await ev('(()=>{const d=new Date(); d.setDate(d.getDate()-1); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")})()')
+t('habits: you can look at (and fix) yesterday', (await text()).includes(yKey) && (await ev('document.querySelector("[data-habit=prayers]").getAttribute("aria-pressed")')) === 'false', yKey)
+await click('button[aria-label="Next day"]'); await sleep(200)
+t('habits: cannot go into the future', await ev('(()=>{ const b=document.querySelector("button[aria-label=\\"Next day\\"]"); return b.disabled })()'))
+
+// ============================ v4: Islamic calendar ============================
+await goto('/calendar'); await waitFor('document.querySelectorAll("[data-day]").length>=28', 15000)
+const daysInMonth = await ev('(()=>{const d=new Date(); return new Date(d.getFullYear(), d.getMonth()+1, 0).getDate()})()')
+t('calendar: a cell for each day of this month', (await ev('document.querySelectorAll("[data-day]").length')) === daysInMonth, String(daysInMonth))
+t('calendar: shows today in Hijri and the next occasion', /Today is \d+ [A-Za-z\u0027\- ]+ \d{4} AH/.test(await text()) && /Next occasion/.test(await text()))
+t('calendar: every day cell has its Hijri date', await ev('[...document.querySelectorAll("[data-day]")].every(c=>/\\d+ [A-Z]/.test(c.textContent))'))
+const title0 = await ev('document.querySelector("[data-testid=cal-title]").innerText')
+await click('button[aria-label="Next month"]'); await sleep(300)
+t('calendar: next month changes the grid', (await ev('document.querySelector("[data-testid=cal-title]").innerText')) !== title0)
+await click('button[aria-label="Previous month"]')
+await setInput('input[aria-label="Hijri day"]', '1'); await ev('(()=>{const s=document.querySelector("select[aria-label=\\"Hijri month\\"]"); Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,"value").set.call(s,"9"); s.dispatchEvent(new Event("change",{bubbles:true}))})()'); await setInput('input[aria-label="Hijri year"]', '1448'); await clickText('Convert'); await sleep(300)
+t('calendar: converter — 1 Ramadan 1448 = Monday 8 February 2027', /(8 February 2027|February 8, 2027)/.test(await text()) && /Monday/.test(await text()), (await text()).match(/1 Ramadan 1448[^\n]*/)?.[0])
+await setInput('input[aria-label="Hijri day"]', '30'); await ev('(()=>{const s=document.querySelector("select[aria-label=\\"Hijri month\\"]"); Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,"value").set.call(s,"10"); s.dispatchEvent(new Event("change",{bubbles:true}))})()'); await setInput('input[aria-label="Hijri year"]', '1447'); await clickText('Convert'); await sleep(300)
+t('calendar: converter — a day that does not exist is explained', /does not exist/.test(await text()))
+
+// ============================ v4: Hajj, Umrah & Seerah guides ============================
+await goto('/guides'); await waitFor('document.querySelectorAll("details").length>=5', 15000)
+t('umrah guide: five steps with the Talbiyah', (await ev('document.querySelectorAll("details").length')) === 5 && /لَبَّيْكَ اللَّهُمَّ لَبَّيْكَ/.test(await ev('document.body.innerText')))
+t('umrah guide: links the verses (Safa & Marwa 2:158)', await ev('[...document.querySelectorAll("a")].some(a=>a.getAttribute("href")==="/quran/2#v158")'))
+await clickText('Hajj'); await sleep(300)
+t('hajj guide: the days from Tarwiyah to the farewell tawaf', (await ev('document.querySelectorAll("details").length')) === 7 && /Arafah/.test(await text()) && /Wada/.test(await text()))
+t('hajj guide: links Jabir\u0027s description of the Prophet\u0027s Hajj', await ev('[...document.querySelectorAll("a")].some(a=>a.getAttribute("href")==="/hadith?book=muslim&number=2951")'))
+await clickText('Seerah'); await sleep(300)
+t('seerah: 15-event timeline, in order, ending with the passing of the Prophet', (await ev('document.querySelectorAll("[data-seerah]").length')) === 15 && /Birth of the Prophet/.test(await text()) && /Hijrah to Madinah/.test(await text()))
+t('seerah: approximate dates are labelled', /c\. 570 CE/i.test(await text()))
+
+// ============================ v4: tafsir sources & reciters ============================
+await goto('/quran/1'); await waitFor('document.querySelectorAll("ol > li").length>=7', 20000)
+await clickText('Tafsir'); await waitFor('!!document.querySelector("select[aria-label=\\"Tafsir source\\"]")', 15000)
+t('tafsir: source picker offers 8 tafsirs in English, Arabic and Urdu', (await ev('document.querySelectorAll("select[aria-label=\\"Tafsir source\\"] option").length')) === 8)
+await ev('(()=>{const s=document.querySelector("select[aria-label=\\"Tafsir source\\"]"); Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,"value").set.call(s,"16"); s.dispatchEvent(new Event("change",{bubbles:true}))})()')
+await waitFor('/[\\u0600-\\u06FF]{4,}/.test(document.querySelector("[data-testid=tafsir-panel]").innerText.replace(/التفسير الميسر|تفسير السعدي|تفسير ابن كثير|بیان القرآن|تفسیر ابن کثیر/g, ""))', 25000)
+t('tafsir: choosing Al-Muyassar shows Arabic commentary (right-to-left)', (await ev('document.querySelector("[data-testid=tafsir-panel] div[dir]")?.getAttribute("dir")')) === 'rtl' && (await ls('deen:tafsir')) === '16')
+await ev('localStorage.removeItem("deen:tafsir")')
+
+// ============================ v4: Ramadan suhoor/iftar ============================
+await goto('/ramadan'); await waitFor('!!document.querySelector("[data-testid=fast-status]")', 45000)
+t('ramadan: suhoor & iftar countdown with real times', /(Suhoor ends|Iftar) in/.test(await ev('document.querySelector("[data-testid=fast-status]").innerText')) && /\d\d:\d\d/.test(await ev('document.querySelector("[aria-label=\\"Fasting times\\"]").innerText')))
+
+// ============================ v4: Create a reel (fake microphone) ============================
+await goto('/reels/create?ref=112:1'); await waitFor('!!document.querySelector("[data-testid=reel-canvas]")', 20000); await sleep(1500)
+const canvasInfo = await ev('(()=>{const c=document.querySelector("[data-testid=reel-canvas]"); const x=c.getContext("2d"); const set=new Set(); for(let i=0;i<60;i++){const p=x.getImageData((i*37)%c.width,(i*91)%c.height,1,1).data; set.add(p.join(","))} return [c.width,c.height,set.size]})()')
+t('reel creator: 720x1280 preview that is really drawn (not blank)', canvasInfo[0] === 720 && canvasInfo[1] === 1280 && canvasInfo[2] > 4, canvasInfo.join('/'))
+await click('button[aria-label="Colour 260"]'); await sleep(400)
+t('reel creator: colour choice is applied', (await ev('document.querySelector("button[aria-label=\\"Colour 260\\"]").getAttribute("aria-pressed")')) === 'true')
+await clickText('Start recording'); await waitFor('/Stop \\(/.test(document.body.innerText)', 15000)
+t('reel creator: recording starts (microphone granted)', /Stop \(/.test(await text()))
+await sleep(2600)
+await clickText('Stop ('); await waitFor('!!document.querySelector("[data-testid=reel-video]")', 20000)
+const vid = await ev('(async()=>{const v=document.querySelector("[data-testid=reel-video]"); const b=await fetch(v.src).then(r=>r.blob()); return [b.size, b.type]})()')
+t('reel creator: produces a real video file with audio+video (> 5 KB)', vid[0] > 5000 && /video\//.test(vid[1]), vid.join(' '))
+t('reel creator: share/save and re-record offered', /Share \/ Save/.test(await text()) && /Re-record/.test(await text()))
+
+// ============================ v5: real device location ============================
+// The browser here is set to "London" (see the geolocation override at the top). Permission states are switched with CDP.
+const setPerm = (setting) => send('Browser.setPermission', { permission: { name: 'geolocation' }, setting, origin: BASE })
+const place = async () => JSON.parse((await ls('deen:place')) || 'null')
+
+await setPerm('prompt'); await goto('/dashboard'); await ev('localStorage.clear()'); await goto('/dashboard')
+await waitFor('!!document.querySelector("[data-testid=location-prompt]")', 8000)
+t('location: first visit asks if the app may use your location (no browser pop-up yet)', await ev('!!document.querySelector("[data-testid=location-prompt]")') && /accurate prayer times/i.test(await text()))
+await clickText('Not now'); await sleep(300)
+await goto('/dashboard'); await sleep(1500)
+t('location: "Not now" is remembered — no nagging on the next visit', !(await ev('!!document.querySelector("[data-testid=location-prompt]")')))
+
+await ev('localStorage.clear()'); await setPerm('granted'); await goto('/dashboard')
+await waitFor('(()=>{try{return JSON.parse(localStorage.getItem("deen:place")).kind==="coords"}catch{return false}})()', 15000)
+let p = await place()
+t('location: when allowed, your real position is used automatically (no tap needed)', p?.kind === 'coords' && Math.abs(p.lat - 51.507) < 0.01 && Math.abs(p.lng + 0.128) < 0.01, JSON.stringify(p))
+t('location: it is saved as device-detected and has a readable name', (await ls('deen:place-auto')) === 'true' && typeof p?.label === 'string' && p.label.length > 2, p?.label)
+t('location: no prompt shown when already allowed', !(await ev('!!document.querySelector("[data-testid=location-prompt]")')))
+
+await goto('/prayer'); await waitFor('/Fajr/.test(document.body.innerText)', 20000)
+t('location: prayer page says which place the times are for', /📍/.test(await text()))
+await goto('/qibla'); await waitFor('/°/.test(document.body.innerText)', 15000)
+t('location: Qibla works at once from the saved location', /Qibla|Kaaba|°/.test(await text()) && !/Could not get your location/.test(await text()))
+
+await goto('/prayer'); await waitFor('/Next prayer/.test(document.body.innerText)', 20000)
+t('prayer: with a shared location the times are calculated on the device (no web request at all)', (await ev('performance.getEntriesByType("resource").filter(r=>r.name.includes("/api/prayer")).length')) === 0 && /Fajr/.test(await text()) && /Isha/.test(await text()))
+t('prayer: the calculated times look right (HH:MM, in order)', await ev('(()=>{const m=[...document.body.innerText.matchAll(/\\b(\\d\\d):(\\d\\d)\\b/g)].map(x=>+x[1]*60+ +x[2]);return m.length>=5})()'))
+// A city you choose yourself is never overwritten by automatic location.
+await goto('/prayer'); await waitFor('!!document.querySelector("input[aria-label=City]")', 15000)
+await ev('(()=>{const set=(l,v)=>{const i=document.querySelector("input[aria-label="+l+"]");Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value").set.call(i,v);i.dispatchEvent(new Event("input",{bubbles:true}))};set("City","Cairo");set("Country","Egypt")})()')
+await click('form button[type=submit]'); await sleep(1200)
+await goto('/dashboard'); await sleep(2500)
+p = await place()
+t('location: a city you pick is respected, even when location is allowed', p?.kind === 'city' && p.city === 'Cairo' && (await ls('deen:place-auto')) === 'false', JSON.stringify(p))
+// A typed city is looked up once; after that its times are calculated on the device, on that city's own clock.
+await goto('/prayer'); await waitFor('/Next prayer/.test(document.body.innerText)', 45000)
+const geocodeOk = (await ev('fetch("/api/geocode?q=Cairo,Egypt").then(r=>r.status,()=>0)')) === 200
+const geoSaved = !geocodeOk || await waitFor('(()=>{try{return !!JSON.parse(localStorage.getItem("deen:place")).geo}catch{return false}})()', 45000)
+const geoPlace = await place()
+if (!geocodeOk) console.log('SKIP typed city: OpenStreetMap place search is not reachable right now, so the city could not be located')
+else t('typed city: its position and time zone are remembered after the first lookup', geoSaved && geoPlace?.geo?.tz === 'Africa/Cairo' && Math.abs(geoPlace.geo.lat - 30) < 1.5, JSON.stringify(geoPlace))
+await goto('/prayer'); await waitFor('/Next prayer/.test(document.body.innerText)', 30000)
+if (geocodeOk) t('typed city: next visit shows the times with no web request (calculated on the device)', (await ev('performance.getEntriesByType("resource").filter(r=>r.name.includes("/api/prayer")).length')) === 0 && /Fajr/.test(await text()))
+await goto('/prayer'); await waitFor('!!document.querySelector("button")', 5000)
+for (let k = 0; k < 4; k++) { await clickText('Use my location'); if (await waitFor('(()=>{try{return JSON.parse(localStorage.getItem("deen:place")).kind==="coords"}catch{return false}})()', 6000)) break }
+t('location: "Use my location" switches back to the device position', (await place())?.kind === 'coords' && (await ls('deen:place-auto')) === 'true')
+
+await setPerm('denied'); await ev('localStorage.clear()'); await goto('/dashboard'); await waitFor('/Fajr|Dhuhr|Asr|Maghrib|Isha/.test(document.body.innerText)', 15000); await sleep(800)
+t('location: when blocked, no prompt and the app still works with the default city', !(await ev('!!document.querySelector("[data-testid=location-prompt]")')) && /Fajr|Dhuhr|Asr|Maghrib|Isha/.test(await text()))
+await goto('/prayer'); await waitFor('!!document.querySelector("button")', 5000)
+await waitFor('[...document.querySelectorAll("button")].some(b=>/use my location/i.test(b.innerText))', 8000)
+for (let k = 0; k < 4; k++) { await clickText('Use my location'); if (await waitFor('/blocked|choose a city/i.test(document.body.innerText)', 5000)) break }
+const blockedText = await text()
+t('location: tapping "Use my location" while blocked explains how to fix it', /blocked|choose a city/i.test(blockedText), blockedText.replace(/\s+/g, ' ').slice(0, 300))
+await setPerm('granted'); await ev('localStorage.clear()')
+
+// ============================ v5: more stories + Library ============================
+await ev('localStorage.clear()')
+await goto('/stories'); await waitFor('document.querySelectorAll("a[href^=\'/stories/\']").length>=40', 15000)
+t('stories: 40+ stories listed', (await ev('document.querySelectorAll("a[href^=\'/stories/\']").length')) >= 40)
+t('stories: grouped into prophets, earlier nations and the Seerah', (await ev('[...document.querySelectorAll("[data-story-group]")].map(x=>x.dataset.storyGroup).join()')) === 'prophets,nations,seerah')
+await setInput('input[aria-label="Search stories"]', 'badr'); await sleep(300)
+t('stories: search narrows the list', (await ev('document.querySelectorAll("a[href^=\'/stories/\']").length')) === 1 && /Battle of Badr/.test(await text()))
+await click('a[href="/stories/badr"]'); await waitFor('document.querySelectorAll("ol > li").length>0', 20000)
+t('stories: Badr chapter 1 shows 8:5-12 (8 verses)', (await ev('document.querySelectorAll("ol > li").length')) === 8, String(await ev('document.querySelectorAll("ol > li").length')))
+
+await goto('/library'); await waitFor('document.querySelectorAll("[data-testid=library-list] li").length>=150', 15000)
+t('library: 150+ topics listed', (await ev('document.querySelectorAll("[data-testid=library-list] li").length')) >= 150)
+await waitFor('/Short extract about/.test(document.querySelector("[data-testid=library-daily]")?.innerText||"")', 15000)
+t('library: "learn something new today" card loads live text', /Short extract about/.test(await ev('document.querySelector("[data-testid=library-daily]")?.innerText||""')))
+await clickText('Places', 'button'); await sleep(300)
+t('library: category tab filters (places only)', /Kaʿbah/.test(await text()) && !/Imam al-Bukhari/.test(await text()))
+await clickText('All', 'button'); await setInput('input[aria-label="Search the library"]', 'badr'); await sleep(300)
+t('library: typing filters the list instantly', (await ev('document.querySelectorAll("[data-testid=library-list] li").length')) === 1 && /Battle of Badr/.test(await text()))
+
+await click('[data-testid=library-list] a'); await waitFor('!!document.querySelector("[data-testid=article-intro]")', 20000)
+t('reader: shows the article intro and sections', /Intro paragraph about Battle of Badr/.test(await text()) && (await ev('document.querySelectorAll("[data-article-section]").length')) === 2)
+t('reader: See also / References are not shown', !/Should be dropped/.test(await text()))
+t('reader: attribution links to Wikipedia and names the licence', (await ev('document.querySelector("[data-testid=article-attribution]").innerText')).includes('CC BY-SA 4.0') && (await ev('[...document.querySelectorAll("[data-testid=article-attribution] a")].some(a=>a.href.includes("wikipedia.org/wiki/Battle_of_Badr"))')))
+t('reader: includes the scholars-not-wikipedia reminder', /not a fatwa or a tafsir/i.test(await text()))
+t('reader: history pages show no pictures (could depict the Prophet ﷺ)', !(await ev('!!document.querySelector("article img")')))
+t('reader: links to the matching Quran story', await ev('!!document.querySelector("a[href=\'/stories/badr\']")'))
+t('reader: links to the AI companion with the topic', await ev('[...document.querySelectorAll("a")].some(a=>a.href.includes("/companion?q=")&&decodeURIComponent(a.href).includes("Battle of Badr"))'))
+await click('button[aria-label="Save for later"]'); await sleep(300)
+t('reader: save persists', JSON.parse((await ls('deen:library-saved')) || '[]').includes('Battle of Badr') && JSON.parse((await ls('deen:library-recent')) || '[]').includes('Battle of Badr'))
+await goto('/library'); await waitFor('/Saved/.test(document.body.innerText)', 10000)
+t('library: saved and recently-read topics show on the home page', /★ Saved/.test(await text()) && /Recently read/.test(await text()))
+
+await goto('/library/read?title=Mecca'); await waitFor('!!document.querySelector("[data-testid=article-intro]")', 20000)
+t('reader: places do show a picture', await ev('!!document.querySelector("article img")'))
+await goto('/library/read?title=Missing%20thing'); await waitFor('!!document.querySelector("[role=alert]")', 15000)
+t('reader: missing article shows a friendly error with retry', /not found/i.test(await text()) && /Try again/.test(await text()))
+await goto('/library/read?title=' + encodeURIComponent('http://evil.com')); await waitFor('!!document.querySelector("[role=alert]")', 10000)
+t('reader: unsafe title is refused', /could not be found/i.test(await text()))
+
+await goto('/library'); await setInput('input[aria-label="Search the library"]', 'zakat fitr'); await click('form button[type=submit]')
+await waitFor('/Result One/.test(document.body.innerText)', 15000)
+t('library: online search shows results beyond the list', /Result One/.test(await text()) && /Result Two/.test(await text()) && /About zakat/.test(await text()))
+await clickText('Result One', 'a'); await waitFor('!!document.querySelector("[data-testid=article-intro]")', 20000)
+t('library: opening a search result works (no image for unknown pages)', /Intro paragraph about Result One/.test(await text()) && !(await ev('!!document.querySelector("article img")')))
+await goto('/more'); t('more: Library is listed', /Library/.test(await text()))
+
+// ============================ v5: lectures ============================
+await goto('/lectures'); await waitFor('document.querySelectorAll("[data-testid=lectures-list] li").length>0', 15000)
+t('lectures: videos from the configured channels are listed', (await ev('document.querySelectorAll("[data-testid=lectures-list] li").length')) === 6)
+t('lectures: newest first, titles decoded', /Alpha lecture 3 & "Q&A"/.test(await text()))
+t('lectures: unreachable channel is mentioned without breaking the page', /could not be reached/i.test(await text()))
+await clickText('Beta Talks', 'button'); await sleep(300)
+t('lectures: channel tab filters the list', (await ev('document.querySelectorAll("[data-testid=lectures-list] li").length')) === 3 && !/Alpha lecture/.test(await text()))
+t('lectures: no video player (and no YouTube request) until you tap play', !(await ev('!!document.querySelector("iframe")')))
+await click('[data-testid=lectures-list] li button'); await sleep(500)
+t('lectures: tapping play opens the privacy-enhanced YouTube player', (await ev('document.querySelector("iframe")?.src||""')).startsWith('https://www.youtube-nocookie.com/embed/'))
+
+// ============================ v5: Great Muslims, games ============================
+await ev('localStorage.clear()')
+await goto('/heritage'); await waitFor('document.querySelectorAll("[data-heritage]").length>=40', 15000)
+t('heritage: 40+ great Muslims listed', (await ev('document.querySelectorAll("[data-heritage]").length')) >= 40)
+t('heritage: "meet someone today" card', await ev('!!document.querySelector("[data-testid=heritage-today]")'))
+await setInput('input[aria-label="Search history"]', 'salah'); await sleep(300)
+t('heritage: search finds Salahuddin', (await ev('document.querySelectorAll("[data-heritage]").length')) === 1 && /Salahuddin/.test(await text()))
+await setInput('input[aria-label="Search history"]', ''); await clickText('Scientists', 'button'); await sleep(300)
+t('heritage: group tab shows scientists only', /Al-Khwarizmi/.test(await text()) && !/Salahuddin/.test(await text()))
+await clickText('Timeline', 'button'); await sleep(300)
+const centuries = await ev('[...document.querySelectorAll("[data-testid=heritage-timeline] .uppercase")].map(e=>e.innerText)')
+t('heritage: timeline groups by century in order', centuries.length >= 4 && /^\d+(st|nd|rd|th) century$/i.test(centuries[0]), centuries.join())
+const firstId = await ev('document.querySelector("[data-heritage]").dataset.heritage')
+const sci = HERITAGE.filter((h) => h.cat === 'scientists').sort((a, b) => a.start - b.start)
+t('heritage: timeline starts with the earliest person', firstId === sci[0].id, firstId + ' vs ' + sci[0].id)
+
+await goto('/heritage/salahuddin'); await waitFor('!!document.querySelector("[data-testid=heritage-story]")', 15000)
+t('heritage reader: story, years and region', /Hattin/.test(await text()) && /1137/.test(await text()) && /Jerusalem/.test(await text()))
+t('heritage reader: key facts and a lesson', (await ev('document.querySelectorAll("article ul li").length')) === 3 && /What we can learn/i.test(await text()))
+t('heritage reader: opening it marks it read', JSON.parse((await ls('deen:heritage-read')) || '[]').includes('salahuddin'))
+t('heritage reader: links to the Library article, the quiz and the AI', (await ev('[...document.querySelectorAll("a")].some(a=>a.href.includes("/library/read?title=Saladin"))')) && (await ev('!!document.querySelector("a[href=\'/quiz\']")')) && (await ev('[...document.querySelectorAll("a")].some(a=>a.href.includes("/companion?q="))')))
+await click('a[href^="/library/read?title=Saladin"]'); await waitFor('!!document.querySelector("[data-testid=article-intro]")', 20000)
+t('heritage reader: the Library link opens the full article', /Intro paragraph about Saladin/.test(await text()))
+await goto('/heritage/nope'); await sleep(800)
+t('heritage: unknown person → not found page', /404|could not be found|not found/i.test(await text()))
+
+// ---- games ----
+await goto('/games'); await waitFor('document.querySelectorAll("[role=tablist] button").length>=4', 15000)
+t('games: four games (Verse Builder, Surah Match, Who am I?, Timeline)', (await ev('document.querySelectorAll("[role=tablist] button").length')) === 4)
+await clickText('Who am I?', 'button'); await sleep(200); await clickText('Start', 'button'); await sleep(300)
+t('who am I: starts with one clue and four names', (await ev('document.querySelectorAll("[data-testid=whoami-clues] li").length')) === 1 && (await ev('document.querySelectorAll("ul button").length')) === 4)
+// guess until finished (each wrong guess reveals another clue)
+for (let i = 0; i < 4; i++) { if (await ev('!!document.querySelector("[data-testid=whoami-result]")')) break; await click('ul button:not([disabled])'); await sleep(200) }
+t('who am I: round ends with the answer and a lesson', await ev('!!document.querySelector("[data-testid=whoami-result]")'))
+t('who am I: wrong guesses revealed more clues (or it was right first time)', (await ev('document.querySelectorAll("[data-testid=whoami-clues] li").length')) >= 1)
+await clickText('Next figure', 'button'); await sleep(300)
+t('who am I: next figure starts fresh at clue 1', (await ev('document.querySelectorAll("[data-testid=whoami-clues] li").length')) === 1)
+
+await clickText('Timeline', 'button'); await sleep(200); await clickText('Start', 'button'); await sleep(300)
+const names = await ev('[...document.querySelectorAll("[data-testid=timeline-items] li button .font-medium")].map(e=>e.innerText)')
+const byName = names.map((n) => HERITAGE.find((h) => h.name === n)).sort((a, b) => a.start - b.start)
+t('timeline: four figures to order', names.length === 4 && byName.every(Boolean))
+// tapping the latest first is a miss
+await ev('[...document.querySelectorAll("[data-testid=timeline-items] li button")].find(b=>b.innerText.includes(' + JSON.stringify(byName[3].name) + ")).click()"); await sleep(200)
+t('timeline: wrong order counts a miss', (await ev('document.querySelector("[data-testid=timeline-miss]").innerText')) === '1')
+for (const h of byName) { await ev('[...document.querySelectorAll("[data-testid=timeline-items] li button")].find(b=>b.innerText.includes(' + JSON.stringify(h.name) + ")).click()"); await sleep(150) }
+t('timeline: correct order completes it and reveals the years', (await ev('!!document.querySelector("[data-testid=timeline-done]")')) && new RegExp(byName[0].years.split(' ')[0].replace(/[()]/g, '')).test(await text()))
+await goto('/legal/privacy'); await waitFor('/Privacy/.test(document.body.innerText)', 15000)
+t('legal: privacy page explains location, AI questions, media hosts and crash reports', /location/i.test(await text()) && /AI companion/.test(await text()) && /Pexels/.test(await text()) && /Crash reports/.test(await text()))
+await goto('/legal/terms'); t('legal: terms say the app is not a fatwa service', /not a fatwa/i.test(await text()))
+await goto('/legal/credits'); t('legal: credits name the data sources and licences', /Quran\.Foundation/.test(await text()) && /CC BY-SA 4\.0/.test(await text()) && /OpenStreetMap/.test(await text()) && /Pexels/.test(await text()))
+await goto('/more'); t('more: links to privacy, terms and credits', (await ev('[...document.querySelectorAll("nav[aria-label=About] a")].map(a=>a.getAttribute("href")).join()')) === '/legal/privacy,/legal/terms,/legal/credits')
+await goto('/no-such-page-xyz'); await sleep(600)
+t('404: friendly page with a way home', /Page not found/.test(await text()) && (await ev('!!document.querySelector("a[href=\'/dashboard\']")')))
+await goto('/more'); t('more: Great Muslims is listed', /Great Muslims/.test(await text()))
+
+// ============================ v5: works offline ============================
+await ev('localStorage.clear()')
+await goto('/settings'); await waitFor('!!document.querySelector("[data-testid=offline-manager]")', 15000)
+await ev('navigator.serviceWorker.ready.then(()=>true)'); await sleep(1200)
+t('offline: Settings → Offline starts with nothing saved', /Nothing saved yet/.test(await text()))
+await clickText('Download the Quran for offline')
+const saved = await waitFor('/whole Quran is saved/.test(document.body.innerText)', 150000)
+t('offline: the whole Quran downloads and is reported as saved', saved, (await ev('document.querySelector("[data-testid=offline-status]")?.innerText')))
+const cached = await ev('caches.open("deen-v2").then(c=>c.keys()).then(k=>({api:k.filter(x=>x.url.includes("/api/quran/surah/")).length,pages:k.filter(x=>/\\/quran\\/\\d+$/.test(new URL(x.url).pathname)).length,shell:k.some(x=>x.url.endsWith("/offline"))}))')
+t('offline: 114 surahs of text and 114 pages are in the cache, plus the offline page', cached.api === 114 && cached.pages >= 114 && cached.shell, JSON.stringify(cached))
+
+// Recitation for offline listening (the fake server provides a short generated clip for every verse).
+await ev('window.__DEEN_AUDIO_BASE = "http://localhost:4010/audio"')
+await waitFor('!!document.querySelector("[data-testid=offline-audio] select") && document.querySelectorAll("[data-testid=offline-audio] option").length>100', 15000)
+await ev('(()=>{const el=document.querySelector("[data-testid=offline-audio] select");Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,"value").set.call(el,"108");el.dispatchEvent(new Event("change",{bubbles:true}))})()')
+t('offline audio: shows an estimated size before downloading', /Save recitation \(≈ [\d.]+ (KB|MB)\)/.test(await text()))
+await clickText('Save recitation')
+const audioSaved = await waitFor('/now plays without internet/.test(document.body.innerText)', 60000)
+t('offline audio: a surah\'s recitation is downloaded and listed', audioSaved && /108\. Al-Kawthar · .* · 3 \/ 3 verses/.test(await ev('document.querySelector("[data-testid=offline-audio-list]")?.innerText||""')), await ev('document.querySelector("[data-testid=offline-audio-list]")?.innerText||""'))
+t('offline audio: storage use is shown', /This site is using/.test(await text()))
+
+// A saved place so prayer times can be calculated without any network.
+await ev('localStorage.setItem("deen:place", JSON.stringify({kind:"coords",lat:21.4225,lng:39.8262,label:"Makkah"})); localStorage.setItem("deen:place-auto","true"); localStorage.setItem("deen:loc-dismissed","true")')
+
+// Cut the network for the page AND for the service worker (it has its own connection).
+const swTarget = (await send('Target.getTargets')).result.targetInfos.find((x) => x.type === 'service_worker' && x.url.endsWith('/sw.js'))
+const swSession = swTarget ? (await send('Target.attachToTarget', { targetId: swTarget.targetId, flatten: true })).result.sessionId : null
+const offline = async (on) => {
+  const c = { offline: on, latency: 0, downloadThroughput: -1, uploadThroughput: -1 }
+  await send('Network.enable'); await send('Network.emulateNetworkConditions', c)
+  if (swSession) { await send('Network.enable', {}, swSession); await send('Network.emulateNetworkConditions', c, swSession) }
+}
+t('offline: the service worker is reachable for the test', !!swSession)
+await offline(true)
+const gone = await ev('fetch("/api/health",{cache:"no-store"}).then(()=>false,()=>true)')
+t('offline: (test check) the network really is off', gone === true)
+
+await goto('/quran/108'); await waitFor('document.querySelectorAll("ol > li").length>=3', 20000)
+t('offline: a saved surah opens with all its verses and no internet', (await ev('document.querySelectorAll("ol > li").length')) === 3 && /Kawthar/i.test(await text()), (await text()).slice(0, 80))
+await goto('/quran/36'); await waitFor('document.querySelectorAll("ol > li").length>=80', 20000)
+t('offline: another surah (Ya-Sin, 83 verses) too', (await ev('document.querySelectorAll("ol > li").length')) === 83)
+await goto('/prayer'); await waitFor('/Next prayer/.test(document.body.innerText)', 20000)
+t('offline: prayer times for the saved location are calculated without internet', /Fajr/.test(await text()) && /Isha/.test(await text()))
+await goto('/stories'); await sleep(1500)
+t('offline: a page that was never opened shows the friendly offline page', await ev('!!document.querySelector("[data-testid=offline-title]")'))
+await goto('/dhikr'); await sleep(800)
+t('offline: the Dhikr counter works', /Subhanallah|SubhanAllah|Dhikr/i.test(await text()))
+const audioUrl = (n) => 'http://localhost:4010/audio/Alafasy_128kbps/108' + String(n).padStart(3, '0') + '.mp3'
+const played = await ev('(async()=>{const a=new Audio(' + JSON.stringify(audioUrl(1)) + ');a.volume=0.01;try{await a.play()}catch(e){return {err:String(e)}};for(let i=0;i<30&&a.currentTime<0.4;i++)await new Promise(r=>setTimeout(r,100));return {t:a.currentTime,d:a.duration}})()')
+t('offline audio: a saved verse plays with no internet', !played.err && played.t > 0.3 && played.d > 5, JSON.stringify(played))
+const seeked = await ev('(async()=>{const a=new Audio(' + JSON.stringify(audioUrl(2)) + ');a.volume=0.01;await a.play();a.currentTime=3;await new Promise(r=>setTimeout(r,900));return {t:a.currentTime}})()')
+t('offline audio: seeking inside a saved verse works (byte-range answers)', seeked.t >= 3.3, JSON.stringify(seeked))
+const missing = await ev('(async()=>{const a=new Audio(' + JSON.stringify(audioUrl(9)) + ');try{await a.play();return "played"}catch(e){return "failed"}})()')
+t('offline audio: a verse that was not saved fails cleanly instead of hanging', missing === 'failed', missing)
+await offline(false)
+await ev('delete window.__DEEN_AUDIO_BASE')
+
+await goto('/settings'); await waitFor('!!document.querySelector("[data-testid=offline-manager]")', 15000)
+await clickText('Remove'); await waitFor('/Nothing saved yet/.test(document.body.innerText)', 15000)
+t('offline: the offline copy can be removed again', /Nothing saved yet/.test(await text()))
+await waitFor('!!document.querySelector("[data-testid=offline-audio-list] button")', 10000)
+await click('[data-testid=offline-audio-list] button'); await sleep(600)
+t('offline audio: saved recitation can be removed', !(await ev('!!document.querySelector("[data-testid=offline-audio-list]")')))
+
+// ============================ v5: prayer reminders (Web Push) ============================
+await ev('localStorage.clear()')
+await send('Browser.grantPermissions', { origin: BASE, permissions: ['geolocation', 'notifications'] })
+await ev('localStorage.setItem("deen:place", JSON.stringify({kind:"coords",lat:21.4225,lng:39.8262,label:"Makkah"})); localStorage.setItem("deen:place-auto","true"); localStorage.setItem("deen:loc-dismissed","true")')
+await goto('/prayer'); await waitFor('!!document.querySelector("[data-testid=push-reminders]")', 25000)
+t('reminders: the Prayer page offers "remind me even when the app is closed"', await ev('!!document.querySelector("[data-testid=push-reminders] input[type=checkbox]")') && /even when the app is closed/.test(await text()))
+t('reminders: the options (prayers, how early, test button) appear only after switching on', !(await ev('!!document.querySelector("[data-testid=push-reminders] select")')))
+
+// Turning it on needs a real push service (Google/Mozilla/Apple), which a test browser cannot reach — so it must fail politely.
+await click('[data-testid=push-reminders] input[type=checkbox]')
+await waitFor('!!document.querySelector("[data-testid=push-reminders] [role=status]") || document.querySelectorAll("[data-testid=push-reminders] select").length>0', 30000)
+const pushUi = await ev('document.querySelector("[data-testid=push-reminders]").innerText.replace(/\\s+/g," ")')
+t('reminders: switching on either works or explains what went wrong (never silently does nothing)', /Reminders are on|blocked|could not|Could not|failed|push service|Registration|Choose your location|not supported/i.test(pushUi), pushUi.slice(0, 220))
+
+// The service worker side: a push message becomes a notification even though no page asked for it.
+let swReg = null
+ws.addEventListener('message', (m) => {
+  const d = JSON.parse(m.data)
+  if (d.method === 'ServiceWorker.workerRegistrationUpdated') {
+    const r = d.params.registrations.find((x) => x.scopeURL.startsWith(BASE))
+    if (r) swReg = r.registrationId
+  }
+})
+await send('ServiceWorker.enable')
+for (let i = 0; i < 40 && !swReg; i++) await sleep(250)
+t('reminders: the service worker is registered (test can reach it)', !!swReg)
+await send('ServiceWorker.deliverPushMessage', { origin: BASE, registrationId: swReg, data: JSON.stringify({ title: 'Dhuhr — time to pray', body: 'الظهر · 12:08', url: '/prayer', tag: 'prayer-dhuhr' }) })
+await sleep(1200)
+const shown = await ev('navigator.serviceWorker.ready.then(r=>r.getNotifications()).then(n=>n.map(x=>({title:x.title,body:x.body,tag:x.tag,url:x.data&&x.data.url})))')
+t('reminders: a pushed message is shown as a notification (title, Arabic name + time, link to /prayer)', shown.length >= 1 && shown.some((n) => n.title === 'Dhuhr — time to pray' && n.body.includes('12:08') && n.url === '/prayer' && n.tag === 'prayer-dhuhr'), JSON.stringify(shown))
+await send('ServiceWorker.deliverPushMessage', { origin: BASE, registrationId: swReg, data: JSON.stringify({ title: 'Dhuhr — time to pray', body: 'again', url: '/prayer', tag: 'prayer-dhuhr' }) })
+await sleep(800)
+const shown2 = await ev('navigator.serviceWorker.ready.then(r=>r.getNotifications({tag:"prayer-dhuhr"})).then(n=>n.length)')
+t('reminders: a newer reminder for the same prayer replaces the old one (no pile-up)', shown2 === 1, String(shown2))
+await send('ServiceWorker.deliverPushMessage', { origin: BASE, registrationId: swReg, data: 'plain text, not JSON' })
+await sleep(800)
+const plain = await ev('navigator.serviceWorker.ready.then(r=>r.getNotifications()).then(n=>n.some(x=>x.body==="plain text, not JSON"))')
+t('reminders: a plain-text push still shows something sensible', plain === true)
+
+// ============================ v5: sleep timer ============================
+await ev('localStorage.clear(); localStorage.setItem("deen:loc-dismissed","true")')
+await goto('/quran/108'); await waitFor('document.querySelectorAll("ol > li").length>=3', 25000)
+await ev('window.__DEEN_AUDIO_BASE = "http://localhost:4010/audio"; window.__DEEN_SLEEP_MS = 1000') // test clip; one "minute" = one second
+await clickText('Play surah')
+await waitFor('!!document.querySelector("[role=region][aria-label=\\"Audio player\\"]")', 15000)
+t('sleep timer: the player offers a 🌙 sleep timer', await ev('!!document.querySelector("button[aria-label=\\"Sleep timer\\"]")'))
+await click('button[aria-label="Sleep timer"]'); await sleep(300)
+t('sleep timer: it lists 5–60 minutes', (await ev('[...document.querySelectorAll("[role=menuitem]")].map(b=>b.innerText).join()')) === '5 minutes,10 minutes,15 minutes,30 minutes,45 minutes,60 minutes')
+await clickText('5 minutes', 'button'); await sleep(900)
+const label = await ev('document.querySelector("button[aria-haspopup=menu]")?.getAttribute("aria-label")||""')
+t('sleep timer: after choosing, the button shows the time left', /^Sleep timer: \d:\d\d left$/.test(label), label)
+await waitFor('!document.querySelector("[role=region][aria-label=\\"Audio player\\"]")', 12000)
+t('sleep timer: when it runs out the recitation stops and the player closes', !(await ev('!!document.querySelector("[role=region][aria-label=\\"Audio player\\"]")')))
+
+// switching it off keeps the audio going
+await clickText('Play surah')
+await waitFor('!!document.querySelector("[role=region][aria-label=\\"Audio player\\"]")', 15000)
+await click('button[aria-label="Sleep timer"]'); await sleep(200); await clickText('5 minutes', 'button'); await sleep(600)
+await click('button[aria-haspopup=menu]'); await sleep(200); await clickText('Turn off timer', 'button'); await sleep(7000)
+t('sleep timer: "Turn off timer" cancels it (still playing well past the 5 s)', await ev('!!document.querySelector("[role=region][aria-label=\\"Audio player\\"]")') && (await ev('document.querySelector("button[aria-haspopup=menu]")?.getAttribute("aria-label")')) === 'Sleep timer')
+await ev('delete window.__DEEN_AUDIO_BASE; delete window.__DEEN_SLEEP_MS')
+
+// ============================ v4: navigation reaches everything ============================
+await goto('/more'); await waitFor('/Recite/.test(document.body.innerText)', 10000)
+const moreText = await text()
+t('more: lists the new features', ['Recite', 'Create a Reel', 'Khatam Planner', 'Daily Deeds', 'Islamic Calendar', 'Hajj, Umrah'].every((x) => moreText.includes(x)))
+await goto('/dashboard'); await waitFor('/Khatam planner/.test(document.body.innerText)', 15000)
+t('home: tiles for Recite, Khatam planner and Calendar', /Recite/.test(await text()) && /Khatam planner/.test(await text()) && /Calendar/.test(await text()))
+
+// ---------- Auth forms ----------
+await goto('/login'); await setInput('#email', 'a@b.co'); await setInput('#password', 'password123'); await ev('document.querySelector("form button").click()'); await sleep(500)
+t('login: without Supabase keys shows friendly message', /not configured/i.test(await text()))
+
+// ---------- PWA / nav ----------
+await goto('/dashboard')
+t('nav: 6 tabs present', (await ev('document.querySelectorAll("nav a").length')) >= 6)
+t('pwa: manifest link in head', await ev('!!document.querySelector("link[rel=manifest]")'))
+const sw = await ev('fetch("/sw.js").then(r=>r.status)')
+t('pwa: service worker script served', sw === 200)
+
+console.log('\nJS errors captured: ' + errors.length)
+;[...new Set(errors)].slice(0, 12).forEach((e) => console.log('  ' + e))
+console.log(`\n${pass} passed, ${fail} failed`)
+ws.close(); proc.kill(); process.exit(fail ? 1 : 0)

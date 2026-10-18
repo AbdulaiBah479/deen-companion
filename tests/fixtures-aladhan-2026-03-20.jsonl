@@ -1,0 +1,11 @@
+{"name":"London","lat":51.5074,"lng":-0.1278,"method":3,"tz":"Europe/London","Fajr":"04:10","Sunrise":"06:03","Dhuhr":"12:08","Asr":"15:25","Maghrib":"18:14","Isha":"20:00"}
+{"name":"London","lat":51.5074,"lng":-0.1278,"method":2,"tz":"Europe/London","Fajr":"04:31","Sunrise":"06:03","Dhuhr":"12:08","Asr":"15:25","Maghrib":"18:14","Isha":"19:46"}
+{"name":"Cairo","lat":30.0444,"lng":31.2357,"method":5,"tz":"Africa/Cairo","Fajr":"04:32","Sunrise":"05:59","Dhuhr":"12:03","Asr":"15:29","Maghrib":"18:06","Isha":"19:24"}
+{"name":"Makkah","lat":21.4225,"lng":39.8262,"method":4,"tz":"Asia/Riyadh","Fajr":"05:09","Sunrise":"06:25","Dhuhr":"12:28","Asr":"15:52","Maghrib":"18:32","Isha":"20:02"}
+{"name":"Jakarta","lat":-6.2088,"lng":106.8456,"method":20,"tz":"Asia/Jakarta","Fajr":"04:40","Sunrise":"05:57","Dhuhr":"12:00","Asr":"15:11","Maghrib":"18:03","Isha":"19:13"}
+{"name":"Jakarta","lat":-6.2088,"lng":106.8456,"method":3,"tz":"Asia/Jakarta","Fajr":"04:48","Sunrise":"05:57","Dhuhr":"12:00","Asr":"15:11","Maghrib":"18:03","Isha":"19:09"}
+{"name":"NewYork","lat":40.7128,"lng":-74.006,"method":2,"tz":"America/New_York","Fajr":"05:44","Sunrise":"06:59","Dhuhr":"13:03","Asr":"16:28","Maghrib":"19:08","Isha":"20:24"}
+{"name":"Istanbul","lat":41.0082,"lng":28.9784,"method":13,"tz":"Europe/Istanbul","Fajr":"05:36","Sunrise":"07:01","Dhuhr":"13:17","Asr":"16:40","Maghrib":"19:23","Isha":"20:43"}
+{"name":"Lagos","lat":6.5244,"lng":3.3792,"method":3,"tz":"Africa/Lagos","Fajr":"05:42","Sunrise":"06:51","Dhuhr":"12:54","Asr":"16:04","Maghrib":"18:57","Isha":"20:02"}
+{"name":"KualaLumpur","lat":3.139,"lng":101.6869,"method":17,"tz":"Asia/Kuala_Lumpur","Fajr":"06:01","Sunrise":"07:18","Dhuhr":"13:21","Asr":"16:26","Maghrib":"19:24","Isha":"20:33"}
+{"name":"Karachi","lat":24.8607,"lng":67.0011,"method":1,"tz":"Asia/Karachi","Fajr":"05:20","Sunrise":"06:36","Dhuhr":"12:40","Asr":"16:05","Maghrib":"18:43","Isha":"19:59"}

@@ -15,6 +15,7 @@ type Msg = {
   sources?: Source[]
   provider?: string | null
   mode?: 'llm' | 'cache' | 'sources' | 'device'
+  pending?: boolean // sources found, answer still being written
   question?: string // the user question this answer belongs to (lets us retry on-device)
 }
 type Status = { configured: number; providers: { name: string; available: boolean; retryInSeconds: number }[] }
@@ -58,9 +59,9 @@ function Companion() {
       .then(setStatus)
       .catch(() => setStatus(null))
     detectWebGPU().then(setGpu)
-  }, [messages.length])
+  }, [messages.length, busy])
 
-  const history = () => messages.map((m) => ({ role: m.role === 'ai' ? ('assistant' as const) : ('user' as const), content: m.text }))
+  const history = () => messages.filter((m) => !m.pending).map((m) => ({ role: m.role === 'ai' ? ('assistant' as const) : ('user' as const), content: m.text }))
 
   // Answer with a model running in this browser (no server tokens used).
   async function answerOnDevice(message: string, usePassage: string | undefined, hist: { role: 'user' | 'assistant'; content: string }[]) {
@@ -102,6 +103,18 @@ function Companion() {
     if (localTier !== 'off' && gpu?.ok) return answerOnDevice(message, usePassage, hist)
 
     setBusy(true)
+    let answered = false
+    // The matching verses and hadith are found in a moment; show them while the answer is being written.
+    fetch('/api/ai', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message, history: hist, lang, passage: usePassage, kids, promptOnly: true }),
+    })
+      .then((r) => r.json())
+      .then((p) => {
+        if (!answered && Array.isArray(p.sources) && p.sources.length) setMessages((m) => [...m, { role: 'ai', text: 'Reading these passages and writing your answer…', sources: p.sources, pending: true }])
+      })
+      .catch(() => {})
     try {
       const res = await fetch('/api/ai', {
         method: 'POST',
@@ -109,12 +122,14 @@ function Companion() {
         body: JSON.stringify({ message, history: hist, lang, passage: usePassage, kids }),
       })
       const data = await res.json()
+      answered = true
       setMessages((m) => [
-        ...m,
+        ...m.filter((x) => !x.pending),
         { role: 'ai', text: data.response || data.error || 'Something went wrong. Please try again.', sources: data.sources, provider: data.provider, mode: data.mode, question: message },
       ])
     } catch {
-      setMessages((m) => [...m, { role: 'ai', text: 'Network error. Please try again.' }])
+      answered = true
+      setMessages((m) => [...m.filter((x) => !x.pending), { role: 'ai', text: 'Network error. Please try again.' }])
     } finally {
       setBusy(false)
     }
@@ -223,7 +238,7 @@ function Companion() {
             </div>
           </div>
         )}
-        {busy && !progress && <p className="text-gray-500 text-sm">Searching sources and thinking…</p>}
+        {busy && !progress && !messages.some((m) => m.pending) && <p className="text-gray-500 text-sm">Searching sources and thinking…</p>}
         <div ref={bottomRef} />
       </div>
 

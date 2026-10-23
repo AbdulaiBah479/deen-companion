@@ -94,6 +94,29 @@ ok('network/5xx -> transient 20s, doubling, capped 5 min', [1, 2, 3, 20].map((n)
   ok('too-short/empty answers count as failures', r?.provider === 'B')
 }
 {
+  // slow first provider: the backup starts after hedgeMs and wins, without waiting for the slow one's time-out
+  const a = provider('A', () => new Promise<string>((r) => setTimeout(() => r(GOOD), 400))), b = provider('B', () => GOOD)
+  const chain = new ProviderChain([a, b], { now, hedgeMs: 30, timeoutMs: 2000 })
+  const t0 = Date.now()
+  const r = await chain.run('s', [])
+  ok('a slow provider is hedged: the backup answers first', r?.provider === 'B' && Date.now() - t0 < 300, String(Date.now() - t0))
+}
+{
+  // fast first provider: the backup is never called
+  const a = provider('A', () => GOOD), b = provider('B', () => GOOD)
+  const chain = new ProviderChain([a, b], { now, hedgeMs: 30 })
+  const r = await chain.run('s', [])
+  await new Promise((r) => setTimeout(r, 80))
+  ok('a fast provider answers alone (no wasted calls)', r?.provider === 'A' && b.calls === 0)
+}
+{
+  // everyone fails: null, and nobody is called twice
+  const a = provider('A', () => { throw new ProviderError('boom', 500) }), b = provider('B', () => { throw new ProviderError('boom', 500) })
+  const chain = new ProviderChain([a, b], { now, hedgeMs: 30 })
+  const r = await chain.run('s', [])
+  ok('all providers failing returns null once', r === null && a.calls === 1 && b.calls === 1)
+}
+{
   const chain = new ProviderChain([], { now })
   ok('no providers configured -> null (caller uses sources-only answer)', (await chain.run('s', [])) === null)
 }

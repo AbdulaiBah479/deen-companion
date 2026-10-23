@@ -41,6 +41,9 @@ export default function TermsPage() {
       <p>{contact ? <>Write to <a className="underline text-[#0F766E]" href={`mailto:${contact}`}>{contact}</a>.</> : 'Please contact the operator of this app.'}</p>
 
       <p className="text-sm text-gray-500">
+        © 2026 Abdulai Bah. All rights reserved. You may use the app, but you may not copy, redistribute or reuse its code, design or original content without written permission.
+      </p>
+      <p className="text-sm text-gray-500">
         See also the <Link href="/legal/privacy" className="underline">privacy summary</Link>.
       </p>
     </article>

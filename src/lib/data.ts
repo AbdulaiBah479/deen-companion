@@ -281,3 +281,22 @@ export function getShortHadith() {
   }
   return shortHadith
 }
+
+// ---- Hadith chapters, so every collection can be browsed without searching ----
+export type HadithSection = { id: number; name: string; first: number; last: number; count: number }
+
+export function getHadithSections(bookId: string): HadithSection[] | null {
+  try {
+    return load<[number, string, number, number, number][]>(`hadith/${bookId}.sections.json`).map(([id, name, first, last, count]) => ({ id, name, first, last, count }))
+  } catch {
+    return null
+  }
+}
+
+// English text of the hadith numbered first…last in the bundled Bukhari/Muslim files (null for other books).
+export function getLocalHadithRange(bookId: string, first: number, last: number): { hadithnumber: number; text: string }[] | null {
+  if (bookId !== 'bukhari' && bookId !== 'muslim') return null
+  return load<HadithRow[]>(`hadith/${bookId}.json`)
+    .filter(([n]) => n >= first && n <= last)
+    .map(([hadithnumber, text]) => ({ hadithnumber, text }))
+}

@@ -300,6 +300,24 @@ ok('validation: oversize message -> 400', (await askPatient('a'.repeat(2500))).s
 // 9. The rate limiter protects free quotas from a single heavy visitor
 let limited = 0
 for (let i = 0; i < 20; i++) if ((await ask('salaam ' + i)).status === 429) limited++
+// ───────── hadith: the day's hadith and browsing by chapter ─────────
+{
+  const day = await (await fetch(`${APP}/api/hadith?date=2026-03-20&lang=en`)).json()
+  ok('hadith of the day: a valid date gives a hadith (and it is the same for everyone that day)', typeof day.hadith?.text === 'string' && day.hadith.text.length > 30 && (await (await fetch(`${APP}/api/hadith?date=2026-03-20&lang=en`)).json()).hadith.hadithnumber === day.hadith.hadithnumber)
+  ok('hadith of the day: a malformed date is refused', (await fetch(`${APP}/api/hadith?date=yesterday`)).status === 400)
+  const secs = await (await fetch(`${APP}/api/hadith/sections?book=bukhari`)).json()
+  ok('hadith chapters: Bukhari lists 90+ chapters with counts', secs.sections?.length > 90 && secs.sections[0].name === 'Revelation' && secs.sections[0].count === 7, JSON.stringify(secs.sections?.[0]))
+  ok('hadith chapters: every collection has chapters', (await Promise.all(['muslim', 'abudawud', 'tirmidhi', 'nasai', 'ibnmajah', 'malik', 'nawawi', 'qudsi'].map(async (b) => (await (await fetch(`${APP}/api/hadith/sections?book=${b}`)).json()).sections?.length > 0))).every(Boolean))
+  ok('hadith chapters: unknown collection refused', (await fetch(`${APP}/api/hadith/sections?book=nope`)).status === 400)
+  const ch = await (await fetch(`${APP}/api/hadith/section?book=bukhari&n=1`)).json()
+  ok('hadith chapter: the first Bukhari chapter has its 7 hadith, starting with the intentions hadith', ch.hadiths?.length === 7 && /intentions/.test(ch.hadiths[0].text) && ch.nextOffset === null, JSON.stringify(ch).slice(0, 120))
+  const long = await (await fetch(`${APP}/api/hadith/section?book=bukhari&n=8&limit=20`)).json()
+  ok('hadith chapter: long chapters come 20 at a time with a next offset', long.hadiths?.length === 20 && long.nextOffset === 20)
+  const p2 = await (await fetch(`${APP}/api/hadith/section?book=bukhari&n=8&limit=20&offset=20`)).json()
+  ok('hadith chapter: the next page continues where the first stopped', p2.hadiths?.[0]?.hadithnumber > long.hadiths[19].hadithnumber)
+  ok('hadith chapter: bad chapter or collection is refused', (await fetch(`${APP}/api/hadith/section?book=bukhari&n=9999`)).status === 404 && (await fetch(`${APP}/api/hadith/section?book=zzz&n=1`)).status === 400)
+}
+
 ok('rate limit: a burst beyond 15/min is refused with 429 + Retry-After', limited > 0, `${limited} of 20 refused`)
 
 console.log(fails ? `\n${fails} FAILED` : '\nALL PASSED')

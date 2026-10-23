@@ -23,14 +23,6 @@ function passageContext(ref: unknown, lang: string): string | undefined {
 }
 
 export async function POST(request: NextRequest) {
-  const limit = await rateLimit(`ai:${clientIp(request.headers)}`, 15, 60_000)
-  if (!limit.ok) {
-    return NextResponse.json(
-      { error: 'You are asking very quickly — please wait a moment and try again.' },
-      { status: 429, headers: { 'Retry-After': String(limit.retryAfter) } }
-    )
-  }
-
   let body: { message?: unknown; history?: unknown; lang?: unknown; passage?: unknown; kids?: unknown; promptOnly?: unknown }
   try {
     body = await request.json()
@@ -38,6 +30,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Request body must be valid JSON' }, { status: 400 })
   }
   const { message, history, lang, passage, kids, promptOnly } = body ?? {}
+  // Finding the matching verses (promptOnly) costs no AI quota, so it gets its own, much larger allowance;
+  // only real model calls count against the 15-a-minute limit.
+  const limit = await rateLimit(promptOnly === true ? `ai-prep:${clientIp(request.headers)}` : `ai:${clientIp(request.headers)}`, promptOnly === true ? 60 : 15, 60_000)
+  if (!limit.ok) {
+    return NextResponse.json(
+      { error: 'You are asking very quickly — please wait a moment and try again.' },
+      { status: 429, headers: { 'Retry-After': String(limit.retryAfter) } }
+    )
+  }
 
   if (!message || typeof message !== 'string' || !message.trim()) {
     return NextResponse.json({ error: 'Please provide a message' }, { status: 400 })

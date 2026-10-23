@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { distanceKm } from '@/lib/geo'
 import { clientIp, rateLimit } from '@/lib/ratelimit'
+import { redis, redisConfigured } from '@/lib/redis'
 
 // Nearby mosques from OpenStreetMap. Community-mapped data, so coverage varies by region.
 // Sources, in order: Overpass API mirrors (rich tags) -> Nominatim search (separate OSM service) -> last good result.
@@ -27,19 +28,18 @@ const OVERPASS = [
 
 type Element = { type: string; id: number; lat?: number; lon?: number; center?: { lat: number; lon: number }; tags?: Record<string, string> }
 
-async function fromOverpass(lat: number, lng: number, radius: number): Promise<Mosque[]> {
+async function fromOverpassMirror(url: string, lat: number, lng: number, radius: number): Promise<Mosque[]> {
   const query = `[out:json][timeout:20];(
     nwr["amenity"="place_of_worship"]["religion"="muslim"](around:${radius},${lat},${lng});
     nwr["building"="mosque"](around:${radius},${lat},${lng});
   );out center 60;`
-  let lastError: unknown
-  for (const url of OVERPASS) {
-    try {
+  {
+    {
       const res = await fetch(url, {
         method: 'POST',
         headers: { 'User-Agent': UA, 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' },
         body: `data=${encodeURIComponent(query)}`,
-        signal: AbortSignal.timeout(12000),
+        signal: AbortSignal.timeout(9000),
         cache: 'no-store',
       })
       if (!res.ok) throw new Error(`${url} -> ${res.status}`)
@@ -62,11 +62,8 @@ async function fromOverpass(lat: number, lng: number, radius: number): Promise<M
           },
         ]
       })
-    } catch (e) {
-      lastError = e
     }
   }
-  throw lastError ?? new Error('overpass unavailable')
 }
 
 type NominatimRow = {
@@ -104,6 +101,29 @@ async function fromNominatim(lat: number, lng: number, radius: number): Promise<
     })
 }
 
+// Ask every Overpass mirror and Nominatim at the same time. Nominatim is usually the quickest; Overpass has richer details,
+// so if Nominatim answers first we give Overpass a short head start before settling for it.
+async function lookup(lat: number, lng: number, radius: number): Promise<{ mosques: Mosque[]; source: string }> {
+  const settle = <T,>(p: Promise<T>) => p.then((v) => ({ ok: true as const, v }), () => ({ ok: false as const, v: undefined as T | undefined }))
+  const overpass = settle(
+    Promise.any(OVERPASS.map((u) => fromOverpassMirror(u, lat, lng, radius).then((r) => (r.length ? r : Promise.reject(new Error('empty')))))).then((r) => tidy(r, radius))
+  )
+  const nominatim = settle(fromNominatim(lat, lng, radius).then((r) => tidy(r, radius)))
+  const good = (r: { ok: boolean; v?: Mosque[] }) => r.ok && !!r.v?.length
+  const first = await Promise.race([overpass.then((r) => ['overpass', r] as const), nominatim.then((r) => ['nominatim', r] as const)])
+  if (first[0] === 'overpass' && good(first[1])) return { mosques: first[1].v!, source: 'overpass' }
+  if (first[0] === 'nominatim' && good(first[1])) {
+    const o = await Promise.race([overpass, new Promise<null>((r) => setTimeout(() => r(null), 2500))])
+    if (o && good(o)) return { mosques: o.v!, source: 'overpass' }
+    return { mosques: first[1].v!, source: 'nominatim' }
+  }
+  const [o, n] = await Promise.all([overpass, nominatim])
+  if (good(o)) return { mosques: o.v!, source: 'overpass' }
+  if (good(n)) return { mosques: n.v!, source: 'nominatim' }
+  if (n.ok || o.ok) return { mosques: [], source: n.ok ? 'nominatim' : 'overpass' }
+  throw new Error('no map service answered')
+}
+
 const lastGood = new Map<string, { at: number; mosques: Mosque[]; source: string }>()
 
 function tidy(list: Mosque[], radius: number): Mosque[] {
@@ -119,6 +139,8 @@ function tidy(list: Mosque[], radius: number): Mosque[] {
     .sort((a, b) => a.distanceKm - b.distanceKm)
     .slice(0, 40)
 }
+
+export const maxDuration = 30
 
 export async function GET(request: NextRequest) {
   const sp = request.nextUrl.searchParams
@@ -140,16 +162,25 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ mosques: cached.mosques, radius, source: cached.source, cached: true })
   }
 
-  for (const [source, fn] of [['overpass', fromOverpass], ['nominatim', fromNominatim]] as const) {
+  // Shared across servers for a day (mosques rarely move): the next person nearby gets an instant answer.
+  const sharedKey = 'mosques:' + cacheKey
+  if (redisConfigured()) {
     try {
-      const mosques = tidy(await fn(lat, lng, radius), radius)
-      if (mosques.length || source === 'nominatim') {
-        lastGood.set(cacheKey, { at: Date.now(), mosques, source })
-        return NextResponse.json({ mosques, radius, source })
+      const [hit] = (await redis([['GET', sharedKey]])) as [string | null]
+      if (hit) {
+        const v = JSON.parse(hit) as { mosques: Mosque[]; source: string }
+        lastGood.set(cacheKey, { at: Date.now(), ...v })
+        return NextResponse.json({ mosques: v.mosques, radius, source: v.source, cached: true })
       }
-    } catch (e) {
-      console.warn(`mosque lookup via ${source} failed:`, e instanceof Error ? e.message : e)
-    }
+    } catch {}
+  }
+  try {
+    const { mosques, source } = await lookup(lat, lng, radius)
+    lastGood.set(cacheKey, { at: Date.now(), mosques, source })
+    if (mosques.length && redisConfigured()) redis([['SET', sharedKey, JSON.stringify({ mosques, source }), 'EX', 86_400]]).catch(() => {})
+    return NextResponse.json({ mosques, radius, source })
+  } catch (e) {
+    console.warn('mosque lookup failed:', e instanceof Error ? e.message : e)
   }
   if (cached) return NextResponse.json({ mosques: cached.mosques, radius, source: cached.source, cached: true, stale: true })
   return NextResponse.json({ error: 'The map service is busy right now. Please try again in a minute.' }, { status: 502 })

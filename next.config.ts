@@ -19,7 +19,19 @@ const nextConfig: NextConfig = {
   cacheComponents: true,
   poweredByHeader: false,
   async headers() {
-    return [{ source: "/:path*", headers: securityHeaders }];
+    return [
+      { source: "/:path*", headers: securityHeaders },
+      // Public, read-only data that is the same for everyone: let the CDN keep it close to your users (the app then
+      // loads it in milliseconds instead of waiting for a server). Never applied to /api/ai, push, health or anything personal.
+      {
+        source: "/api/:name(ayah-of-day|hadith|duas|tafsir|names|learn|quran|prayer|search|mosques|geocode)/:path*",
+        headers: [{ key: "Cache-Control", value: "public, max-age=60, s-maxage=900, stale-while-revalidate=86400" }],
+      },
+      {
+        source: "/api/:name(ayah-of-day|hadith|duas|tafsir|names|learn|quran|prayer|search|mosques|geocode)",
+        headers: [{ key: "Cache-Control", value: "public, max-age=60, s-maxage=900, stale-while-revalidate=86400" }],
+      },
+    ];
   },
   // The server reads the bundled Quran/hadith JSON from ./data at runtime; make sure deployments ship it.
   outputFileTracingIncludes: {

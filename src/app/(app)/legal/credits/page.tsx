@@ -34,6 +34,9 @@ export default function CreditsPage() {
         Software: Next.js, React, Tailwind CSS, ts-fsrs (spaced repetition), web-llm (on-device AI) and other open-source libraries under their own licences.
       </p>
       <p className="text-sm text-gray-500">
+        © 2026 Abdulai Bah. All rights reserved. The Deen Companion code, design and original written content may not be copied or reused without written permission. The third-party material listed above stays under its own terms.
+      </p>
+      <p className="text-sm text-gray-500">
         See also <Link href="/legal/privacy" className="underline">privacy</Link> and <Link href="/legal/terms" className="underline">terms</Link>.
       </p>
     </article>

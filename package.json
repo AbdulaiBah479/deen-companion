@@ -1,6 +1,8 @@
 {
   "name": "deen-companion",
   "version": "0.1.0",
+  "author": "Abdulai Bah <babdulai225.2@gmail.com>",
+  "license": "UNLICENSED",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -64,6 +66,7 @@
     "cn": "^0.5.0",
     "date-fns": "^4.4.0",
     "framer-motion": "^14.3.0",
+    "geomagnetism": "^0.2.0",
     "groq-sdk": "^1.6.0",
     "howler": "^2.2.4",
     "lucide-react": "^1.58.0",

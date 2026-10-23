@@ -43,11 +43,13 @@ export class ProviderChain {
   private health = new Map<string, Health>()
   private providers: Provider[]
   private timeoutMs: number
+  private hedgeMs: number
   private now: () => number
 
-  constructor(providers: Provider[], opts: { timeoutMs?: number; now?: () => number } = {}) {
+  constructor(providers: Provider[], opts: { timeoutMs?: number; hedgeMs?: number; now?: () => number } = {}) {
     this.providers = providers
     this.timeoutMs = opts.timeoutMs ?? 20_000
+    this.hedgeMs = opts.hedgeMs ?? 3_500
     this.now = opts.now ?? Date.now
   }
 
@@ -69,25 +71,55 @@ export class ProviderChain {
     })
   }
 
+  // Tries providers in order, but if one is slow (hedgeMs) the next one starts at the same time and the first
+  // good answer wins, so one sluggish provider no longer makes everybody wait for its time-out.
   async run(system: string, history: ChatTurn[]): Promise<{ answer: string; provider: string } | null> {
-    for (const p of this.available()) {
-      try {
-        const answer = await Promise.race([
-          p.run(system, history),
-          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timed out')), this.timeoutMs)),
-        ])
-        if (answer && answer.trim().length > 20) {
-          this.health.delete(p.name) // healthy again
-          return { answer: answer.trim(), provider: p.name }
-        }
-        throw new Error('empty answer')
-      } catch (err) {
-        const prev = this.health.get(p.name)
-        const fails = (prev?.fails ?? 0) + 1
-        const f = classifyFailure(err, fails)
-        this.health.set(p.name, { until: this.now() + f.cooldownMs, fails, lastKind: f.kind })
+    const queue = this.available()
+    if (!queue.length) return null
+    return new Promise((resolve) => {
+      let next = 0
+      let running = 0
+      let done = false
+      let hedge: ReturnType<typeof setTimeout> | undefined
+      const finish = (v: { answer: string; provider: string } | null) => {
+        if (done) return
+        done = true
+        if (hedge) clearTimeout(hedge)
+        resolve(v)
       }
-    }
-    return null
+      const launch = () => {
+        if (done || next >= queue.length) return false
+        const p = queue[next++]
+        running++
+        if (hedge) clearTimeout(hedge)
+        hedge = setTimeout(launch, this.hedgeMs)
+        let timer: ReturnType<typeof setTimeout> | undefined
+        Promise.race([
+          p.run(system, history),
+          new Promise<never>((_, reject) => {
+            timer = setTimeout(() => reject(new Error('timed out')), this.timeoutMs)
+          }),
+        ])
+          .then((answer) => {
+            if (!answer || answer.trim().length <= 20) throw new Error('empty answer')
+            this.health.delete(p.name) // healthy again
+            finish({ answer: answer.trim(), provider: p.name })
+          })
+          .catch((err) => {
+            const prev = this.health.get(p.name)
+            const fails = (prev?.fails ?? 0) + 1
+            const f = classifyFailure(err, fails)
+            this.health.set(p.name, { until: this.now() + f.cooldownMs, fails, lastKind: f.kind })
+          })
+          .finally(() => {
+            if (timer) clearTimeout(timer)
+            running--
+            if (done) return
+            if (!launch() && running === 0) finish(null)
+          })
+        return true
+      }
+      launch()
+    })
   }
 }

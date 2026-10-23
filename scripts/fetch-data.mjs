@@ -102,6 +102,28 @@ for (const [name, edition] of [['bukhari', 'eng-bukhari'], ['muslim', 'eng-musli
   })
 }
 
+// ---- Hadith chapters ("books"/categories) for every collection, so the app can be browsed without searching ----
+// [ [chapterNumber, name, firstHadith, lastHadith, count], … ]
+for (const name of ['bukhari', 'muslim', 'abudawud', 'tirmidhi', 'nasai', 'ibnmajah', 'malik', 'nawawi', 'qudsi']) {
+  await save(`hadith/${name}.sections.json`, async () => {
+    const d = await getJson(`${HADITH}/eng-${name}.min.json`)
+    const have = d.hadiths.filter((h) => h.text && h.text.trim().length > 0).map((h) => h.hadithnumber).filter((n) => Number.isFinite(n) && n >= 1)
+    const sec = d.metadata?.sections ?? {}
+    const det = d.metadata?.section_details ?? {}
+    const rows = []
+    for (const k of Object.keys(sec)) {
+      const name_ = String(sec[k] || '').trim()
+      const r = det[k]
+      if (!name_ || !r) continue
+      const first = Math.ceil(r.hadithnumber_first)
+      const last = Math.floor(r.hadithnumber_last)
+      const count = have.filter((n) => n >= first && n <= last).length
+      if (first >= 1 && count > 0) rows.push([Number(k), name_, first, last, count])
+    }
+    if (!rows.length && have.length) rows.push([1, 'All hadith', Math.min(...have), Math.max(...have), have.length])
+    return rows
+  })
+}
 
 
 // ---- Navigation metadata: page (604-page Madani mushaf), juz and quarter-hizb for every verse ----

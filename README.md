@@ -176,3 +176,7 @@ Translations keep their translators’ copyright, which is why `./data` is gener
 
 - **Sleep timer** (🌙 in the audio player): stop recitation after 5–60 minutes with a gentle 4-second fade. Tested in the browser with a shortened clock.
 - **Sunnah reminders** (same push system, optional checkboxes): morning adhkar (Fajr + 30 min), evening adhkar (Asr + 30 min), Friday Surat al-Kahf, Monday/Thursday fasting (evening before), white days 13–15 (evening before). Hijri days use the Umm al-Qura calculation, so a moon-sighting day can differ by one.
+
+## Copyright and licence
+
+© 2026 Abdulai Bah. All rights reserved. This is proprietary software: the code, design and original content may not be copied, modified, redistributed or reused without written permission (see [LICENSE](LICENSE)). Third-party content (Quran text and translations, hadith, Wikipedia text, OpenStreetMap data, videos, open-source libraries) stays under its own terms — see the in-app "Sources & credits" page.

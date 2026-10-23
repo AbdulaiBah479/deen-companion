@@ -27,7 +27,7 @@ delete process.env.GROQ_MODEL
 
 reset()
 process.env.GEMINI_API_KEY = 'k'
-ok('Gemini: two models by default', names().join() === 'Gemini,Gemini (gemini-3.5-flash-lite)', names().join())
+ok('Gemini: three models by default', names().join() === 'Gemini,Gemini (gemini-3.5-flash-lite),Gemini (gemini-3.1-flash-lite)', names().join())
 
 reset()
 process.env.CEREBRAS_API_KEY = 'k'
@@ -56,7 +56,7 @@ ok('Pollinations: "on" enables the keyless provider', names().join() === 'Pollin
 reset()
 Object.assign(process.env, { GEMINI_API_KEY: 'a', GROQ_API_KEY: 'b', MISTRAL_API_KEY: 'c', OPENROUTER_API_KEY: 'd', POLLINATIONS: 'on', CUSTOM_AI_BASE_URL: 'http://x' })
 const order = names()
-ok('order: best first (Gemini, Groq, Mistral…), keyless/local last', order[0] === 'Gemini' && order.indexOf('Groq') < order.indexOf('Mistral') && order.indexOf('Mistral') < order.indexOf('OpenRouter') && order.indexOf('Pollinations') > order.indexOf('OpenRouter') && order.at(-1) === 'Custom', order.join())
+ok('order: fastest first (Groq, then Gemini, Mistral…), keyless/local last', order[0] === 'Groq' && order.indexOf('Gemini') < order.indexOf('Mistral') && order.indexOf('Mistral') < order.indexOf('OpenRouter') && order.indexOf('Pollinations') > order.indexOf('OpenRouter') && order.at(-1) === 'Custom', order.join())
 ok('a typical free setup has 10+ separate quotas to fall back on', order.length >= 10, String(order.length))
 
 // ───────── talking to a (fake) OpenAI-compatible server ─────────

@@ -1,4 +1,4 @@
-import { qiblaBearing, distanceToKaaba } from '../src/lib/qibla.ts'
+import { qiblaBearing, distanceToKaaba, compassHeading, turnBetween } from '../src/lib/qibla.ts'
 import { mulberry32, hashSeed, shuffle } from '../src/lib/random.ts'
 import { newStoredCard, review, isDue, previewIntervals } from '../src/lib/srs.ts'
 let fails = 0
@@ -40,4 +40,7 @@ const rt = review(JSON.parse(JSON.stringify(good)), 'good', new Date(good.due))
 ok('review works on a card reloaded from JSON', typeof rt.due === 'string' && !Number.isNaN(Date.parse(rt.due)))
 const pv = previewIntervals(card, now)
 ok('preview gives labels for all 4 grades', ['again', 'hard', 'good', 'easy'].every((g) => /^\d+[mhd]$/.test((pv as Record<string, string>)[g])), JSON.stringify(pv))
+ok('compass: phone flat, facing north/east/south/west', near(compassHeading(0, 0, 0), 0, 0.5) && near(compassHeading(270, 0, 0), 90, 0.5) && near(compassHeading(180, 0, 0), 180, 0.5) && near(compassHeading(90, 0, 0), 270, 0.5))
+ok('compass: phone held upright (how people hold it), facing north and east', near(compassHeading(0, 90, 0), 0, 0.5) && near(compassHeading(270, 90, 0), 90, 0.5))
+ok('compass: turn between headings takes the short way round', turnBetween(350, 10) === 20 && turnBetween(10, 350) === -20 && turnBetween(90, 90) === 0 && Math.abs(turnBetween(0, 180)) === 180)
 console.log(fails ? `\n${fails} FAILED` : '\nALL PASSED'); process.exit(fails ? 1 : 0)

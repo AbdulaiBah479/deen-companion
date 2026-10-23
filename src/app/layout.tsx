@@ -21,6 +21,10 @@ const quranFont = Amiri_Quran({
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"),
   title: { default: "Deen Companion", template: "%s · Deen Companion" },
+  authors: [{ name: "Abdulai Bah" }],
+  creator: "Abdulai Bah",
+  publisher: "Abdulai Bah",
+  other: { copyright: "© 2026 Abdulai Bah. All rights reserved." },
   openGraph: { siteName: "Deen Companion", type: "website" },
   twitter: { card: "summary_large_image" },
   icons: { icon: "/icon.svg", apple: "/apple-touch-icon.png" },

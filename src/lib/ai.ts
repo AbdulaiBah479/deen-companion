@@ -13,6 +13,8 @@ import { dataAvailable, searchHadithText, searchQuranText } from './data'
 import { AnswerCache, questionKey } from './answer-cache'
 import { ProviderChain, ProviderError, type ChatTurn, type Provider } from './ai-chain'
 import { extractiveAnswer } from './extractive'
+import { createHash } from 'node:crypto'
+import { redis, redisConfigured } from './redis'
 
 export type { ChatTurn } from './ai-chain'
 
@@ -158,7 +160,7 @@ export function configuredProviders(): Provider[] {
 
   // 1. Google Gemini — two models, each with its own free quota.
   if (env.GEMINI_API_KEY) {
-    const models = list(env.GEMINI_MODEL).length ? list(env.GEMINI_MODEL) : ['gemini-3.8-flash', 'gemini-3.5-flash-lite']
+    const models = list(env.GEMINI_MODEL).length ? list(env.GEMINI_MODEL) : ['gemini-3.8-flash', 'gemini-3.5-flash-lite', 'gemini-3.1-flash-lite']
     models.forEach((modelName, i) =>
       out.push({
         name: i === 0 ? 'Gemini' : 'Gemini (' + modelName + ')',
@@ -235,7 +237,8 @@ export function configuredProviders(): Provider[] {
       run: (system, history) => openAICompatible(env.CUSTOM_AI_BASE_URL!, env.CUSTOM_AI_KEY, env.CUSTOM_AI_MODEL || 'llama3.1', chat(system, history)),
     })
   }
-  return out
+  // Groq answers in about a second, so it goes first; everything else keeps its order.
+  return [...out.filter((p) => /^Groq/.test(p.name)), ...out.filter((p) => !/^Groq/.test(p.name))]
 }
 
 // ---------------- State shared across requests ----------------
@@ -254,7 +257,7 @@ function spendOne() {
   budget.used++
 }
 
-const chain = new ProviderChain([], { timeoutMs: 20_000 })
+const chain = new ProviderChain([], { timeoutMs: 15_000, hedgeMs: 3_500 })
 const cache = new AnswerCache<{ answer: string; provider: string }>(300, 24 * 3600_000)
 
 // Which providers are configured, which are resting after hitting a limit, and how many answers are cached.
@@ -309,6 +312,19 @@ export async function askAI(opts: AskOptions): Promise<AIResult> {
     if (hit) return { answer: hit.answer, sources, provider: hit.provider, mode: 'cache' }
   }
 
+  // 1b. The same cache shared by every server (Redis): the first person to ask "Explain 2:255" pays the wait, everyone else gets it instantly.
+  const sharedKey = 'ai:a:' + createHash('sha1').update(key).digest('hex').slice(0, 32)
+  if (cacheable && redisConfigured()) {
+    try {
+      const [raw] = (await redis([['GET', sharedKey]])) as [string | null]
+      if (raw) {
+        const hit = JSON.parse(raw) as { answer: string; provider: string }
+        cache.set(key, hit)
+        return { answer: hit.answer, sources, provider: hit.provider, mode: 'cache' }
+      }
+    } catch {}
+  }
+
   // 2. Providers, skipping any that are resting after hitting a limit.
   const providers = configuredProviders()
   chain.setProviders(providers)
@@ -320,7 +336,10 @@ export async function askAI(opts: AskOptions): Promise<AIResult> {
   const result = dailyBudgetLeft() ? await chain.run(system, history) : null
   if (result) {
     spendOne()
-    if (cacheable) cache.set(key, result)
+    if (cacheable) {
+      cache.set(key, result)
+      if (redisConfigured()) redis([['SET', sharedKey, JSON.stringify(result), 'EX', 604_800]]).catch(() => {})
+    }
     return { answer: result.answer, sources, provider: result.provider, mode: 'llm' }
   }
 

@@ -190,7 +190,7 @@ export default function DashboardPage() {
           <p className="text-right verse-ar" dir="rtl" lang="ar" style={{ fontSize: 'calc(var(--ar-size) * 0.9)' }}>
             {ayah.text_uthmani}
           </p>
-          <p className="text-gray-700 mt-2 verse-tr" dir={isRtl(lang) ? 'rtl' : 'ltr'}>
+          <p className="text-gray-700 mt-2 verse-tr line-clamp-4" dir={isRtl(lang) ? 'rtl' : 'ltr'}>
             {ayah.translations[0]?.text}
           </p>
           <div className="flex gap-3 mt-3 text-sm font-semibold">
@@ -213,12 +213,14 @@ export default function DashboardPage() {
       )}
 
       {/* Tiles */}
-      <div className="grid grid-cols-2 gap-3 mb-4">
+      <div className="grid grid-cols-2 gap-2.5 mb-4">
         {TILES.map((t) => (
-          <Link key={t.href} href={t.href} className="bg-white border border-gray-200 rounded-2xl p-4 hover:border-[#0F766E] transition-colors">
-            <div className="text-3xl mb-1">{t.icon}</div>
-            <div className="font-bold">{t.title}</div>
-            <div className="text-xs text-gray-500">{t.desc}</div>
+          <Link key={t.href} href={t.href} className="bg-white border border-gray-200 rounded-2xl p-3 flex items-center gap-3 hover:border-[#0F766E] transition-colors">
+            <div className="text-2xl shrink-0">{t.icon}</div>
+            <div className="min-w-0">
+              <div className="font-bold text-sm leading-tight">{t.title}</div>
+              <div className="text-[11px] text-gray-500 leading-tight line-clamp-2">{t.desc}</div>
+            </div>
           </Link>
         ))}
       </div>

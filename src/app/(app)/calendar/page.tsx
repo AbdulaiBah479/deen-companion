@@ -100,7 +100,7 @@ export default function CalendarPage() {
             >
               <span className="sr-only">{`${c.key}, ${c.hijri.day} ${HIJRI_MONTHS[c.hijri.month - 1]}`}</span>
               <span className="block text-sm font-semibold" aria-hidden="true">{c.date.getDate()}</span>
-              <span className="block text-[10px] text-gray-500" aria-hidden="true">{c.hijri.day}</span>
+              <span className="block text-[10px] text-gray-600" aria-hidden="true">{c.hijri.day}</span>
               <span className="flex justify-center gap-0.5 h-1.5 mt-0.5">
                 {c.events.slice(0, 3).map((e) => (
                   <span key={e.id} className={`w-1.5 h-1.5 rounded-full ${e.kind === 'eid' ? 'bg-[#D4AF37]' : e.kind === 'holy' ? 'bg-[#0F766E]' : e.kind === 'fast' ? 'bg-sky-500' : 'bg-gray-400'}`} />

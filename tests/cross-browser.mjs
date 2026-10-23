@@ -32,5 +32,30 @@ for (const [label, engine, device] of engines) {
   }
   await browser.close()
 }
-console.log(bad ? `\n${bad} page(s) with problems` : '\nall clean')
+// The opening page's top bar must never let the logo and the buttons touch each other, on any phone width.
+console.log('\nopening header at narrow widths')
+for (const [label, engine] of [['webkit', webkit], ['chromium', { launch: (o) => chromium.launch({ channel: 'msedge', ...o }) }]]) {
+  const browser = await engine.launch()
+  for (const width of [320, 360, 375, 390, 412]) {
+    const page = await (await browser.newContext({ viewport: { width, height: 800 }, deviceScaleFactor: 2 })).newPage()
+    await page.goto(BASE + '/', { waitUntil: 'load' })
+    await page.waitForTimeout(600)
+    const r = await page.evaluate(() => {
+      const nav = document.querySelector('nav')
+      const logo = nav.firstElementChild.getBoundingClientRect()
+      const links = [...nav.querySelectorAll('a')].filter((e) => e.getClientRects().length).map((e) => e.getBoundingClientRect())
+      const touching = links.some((l) => l.left < logo.right + 4 && l.right > logo.left)
+      const W = document.documentElement.clientWidth
+      const outside = [logo, ...links].some((b) => b.right > W + 0.5 || b.left < -0.5)
+      return { touching, outside, logoRight: Math.round(logo.right), firstLinkLeft: links[0] ? Math.round(links[0].left) : null, links: links.length }
+    })
+    const okHeader = !r.touching && !r.outside && r.links >= 1
+    if (!okHeader) bad++
+    console.log((okHeader ? 'PASS ' : 'FAIL ') + label + ' ' + width + 'px  ' + JSON.stringify(r))
+    await page.close()
+  }
+  await browser.close()
+}
+
+console.log(bad ? `\n${bad} problem(s)` : '\nall clean')
 process.exit(bad ? 1 : 0)

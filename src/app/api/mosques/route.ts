@@ -24,6 +24,7 @@ const OVERPASS = [
   'https://overpass-api.de/api/interpreter',
   'https://overpass.kumi.systems/api/interpreter',
   'https://overpass.private.coffee/api/interpreter',
+  'https://overpass.openstreetmap.fr/api/interpreter',
 ]
 
 type Element = { type: string; id: number; lat?: number; lon?: number; center?: { lat: number; lon: number }; tags?: Record<string, string> }
@@ -77,11 +78,18 @@ type NominatimRow = {
 }
 
 async function fromNominatim(lat: number, lng: number, radius: number): Promise<Mosque[]> {
+  const [a, b] = await Promise.allSettled([nominatimQuery('mosque', lat, lng, radius), nominatimQuery('masjid', lat, lng, radius)])
+  const all = [...(a.status === 'fulfilled' ? a.value : []), ...(b.status === 'fulfilled' ? b.value : [])]
+  if (!all.length && a.status === 'rejected' && b.status === 'rejected') throw a.reason
+  return all
+}
+
+async function nominatimQuery(word: string, lat: number, lng: number, radius: number): Promise<Mosque[]> {
   const dLat = radius / 111_000
   const dLng = radius / (111_000 * Math.max(0.1, Math.cos((lat * Math.PI) / 180)))
   const viewbox = [lng - dLng, lat + dLat, lng + dLng, lat - dLat].map((n) => n.toFixed(5)).join(',')
   const res = await fetch(
-    `https://nominatim.openstreetmap.org/search?q=mosque&format=jsonv2&limit=40&bounded=1&viewbox=${viewbox}&addressdetails=1`,
+    `https://nominatim.openstreetmap.org/search?q=${word}&format=jsonv2&limit=40&bounded=1&viewbox=${viewbox}&addressdetails=1`,
     { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(15000), cache: 'no-store' }
   )
   if (!res.ok) throw new Error(`nominatim ${res.status}`)

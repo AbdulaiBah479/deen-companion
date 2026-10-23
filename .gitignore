@@ -49,3 +49,6 @@ next-env.d.ts
 .build.log
 .full.log
 .next-server.log
+
+.vercel
+.env*

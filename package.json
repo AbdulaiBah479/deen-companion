@@ -17,6 +17,8 @@
     "test:resilience": "node --import ./tests/register-ts.mjs --experimental-strip-types --no-warnings tests/resilience.test.mts",
     "test:learn": "node --import ./tests/register-ts.mjs --experimental-strip-types --no-warnings tests/learn.test.mts",
     "test:api": "node --import ./tests/register-ts.mjs --experimental-strip-types --no-warnings tests/api.test.mjs",
+    "test:browsers": "node tests/cross-browser.mjs",
+    "lighthouse": "node tests/lighthouse.mjs",
     "test:full": "node tests/run-integration.mjs",
     "test:recite": "node --import ./tests/register-ts.mjs --experimental-strip-types --no-warnings tests/recite.test.mts",
     "test:life": "node --import ./tests/register-ts.mjs --experimental-strip-types --no-warnings tests/life.test.mts",
@@ -87,6 +89,8 @@
     "axe-core": "^4.14.0",
     "eslint": "^9",
     "eslint-config-next": "16.4.2",
+    "lighthouse": "^13.5.0",
+    "playwright": "^1.64.1",
     "shadcn": "^4.22.0",
     "tailwindcss": "^4",
     "typescript": "^5"

@@ -20,14 +20,14 @@ reset()
 ok('nothing configured → no providers (the app then answers from sources)', names().length === 0)
 
 process.env.GROQ_API_KEY = 'k'
-ok('Groq: two models, each with its own free quota', names().join() === 'Groq,Groq (llama-3.1-8b-instant)', names().join())
+ok('Groq: three models, each with its own free quota', names().join() === 'Groq,Groq (openai/gpt-oss-20b),Groq (qwen/qwen3.8-27b)', names().join())
 process.env.GROQ_MODEL = 'a,b,c'
 ok('Groq: model list can be overridden (comma-separated)', names().join() === 'Groq,Groq (b),Groq (c)', names().join())
 delete process.env.GROQ_MODEL
 
 reset()
 process.env.GEMINI_API_KEY = 'k'
-ok('Gemini: two models by default', names().join() === 'Gemini,Gemini (gemini-2.5-flash-lite)', names().join())
+ok('Gemini: two models by default', names().join() === 'Gemini,Gemini (gemini-3.5-flash-lite)', names().join())
 
 reset()
 process.env.CEREBRAS_API_KEY = 'k'
@@ -86,13 +86,13 @@ reset()
 process.env.AI_COMPAT_BASE_OVERRIDE = `http://localhost:${port}/v1`
 process.env.GROQ_API_KEY = 'secret-groq'
 const r = await configuredProviders()[0].run(system, hist)
-ok('request: Bearer key and the first model are sent to /chat/completions', r.length > 20 && seen[0].auth === 'Bearer secret-groq' && seen[0].model === 'llama-3.3-70b-versatile' && seen[0].url === '/v1/chat/completions', JSON.stringify(seen[0]))
+ok('request: Bearer key and the first model are sent to /chat/completions', r.length > 20 && seen[0].auth === 'Bearer secret-groq' && seen[0].model === 'openai/gpt-oss-120b' && seen[0].url === '/v1/chat/completions', JSON.stringify(seen[0]))
 
 seen.length = 0
 mode = 'limit-first'
 const chain = new ProviderChain(configuredProviders(), { timeoutMs: 5000 })
 const got = await chain.run(system, hist)
-ok('when the first model is rate-limited the second model of the same service answers', !!got && got.provider === 'Groq (llama-3.1-8b-instant)' && seen.map((s) => s.model).join() === 'llama-3.3-70b-versatile,llama-3.1-8b-instant', JSON.stringify(seen.map((s) => s.model)))
+ok('when the first model is rate-limited the second model of the same service answers', !!got && got.provider === 'Groq (openai/gpt-oss-20b)' && seen.map((s) => s.model).join() === 'openai/gpt-oss-120b,openai/gpt-oss-20b', JSON.stringify(seen.map((s) => s.model)))
 mode = 'ok'
 
 seen.length = 0

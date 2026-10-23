@@ -33,21 +33,21 @@ export default function HomePage() {
   return (
     <main className="min-h-screen bg-[#F8FAFC]">
       <nav className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between sticky top-0 z-50">
-        <div className="flex items-center gap-2 font-black text-xl">
+        <div className="flex items-center gap-2 font-black text-lg sm:text-xl min-w-0">
           <span className="text-2xl">☪</span>
           <span className="text-[#0F766E]">Deen</span>
           <span className="text-gold">Companion</span>
         </div>
-        <div className="flex gap-3">
+        <div className="flex gap-2 sm:gap-3 shrink-0">
           <Link
             href="/login"
-            className="px-4 py-2 text-[#0F766E] border border-[#0F766E] rounded-xl text-sm font-semibold hover:bg-[#0F766E] hover:text-white transition-all"
+            className="px-3 sm:px-4 py-2 whitespace-nowrap text-[#0F766E] border border-[#0F766E] rounded-xl text-sm font-semibold hover:bg-[#0F766E] hover:text-white transition-all"
           >
             Sign In
           </Link>
           <Link
             href="/signup"
-            className="px-4 py-2 bg-[#0F766E] text-white rounded-xl text-sm font-semibold hover:bg-[#0D5C57] transition-all"
+            className="px-3 sm:px-4 py-2 whitespace-nowrap bg-[#0F766E] text-white rounded-xl text-sm font-semibold hover:bg-[#0D5C57] transition-all"
           >
             Get Started Free
           </Link>

@@ -135,7 +135,7 @@ async function pickOpenRouterModels(): Promise<string[]> {
 // MODEL env vars accept a comma-separated list (tried in order). Names/models change often, so every one can be overridden.
 export type Compat = { name: string; keyEnv: string; base: string; modelEnv: string; models: string[]; needsModel?: boolean; optIn?: boolean }
 export const COMPAT_PROVIDERS: Compat[] = [
-  { name: 'Groq', keyEnv: 'GROQ_API_KEY', base: 'https://api.groq.com/openai/v1', modelEnv: 'GROQ_MODEL', models: ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant'] },
+  { name: 'Groq', keyEnv: 'GROQ_API_KEY', base: 'https://api.groq.com/openai/v1', modelEnv: 'GROQ_MODEL', models: ['openai/gpt-oss-120b', 'openai/gpt-oss-20b', 'qwen/qwen3.8-27b'] },
   { name: 'Mistral', keyEnv: 'MISTRAL_API_KEY', base: 'https://api.mistral.ai/v1', modelEnv: 'MISTRAL_MODEL', models: ['mistral-small-latest', 'open-mistral-nemo'] },
   { name: 'Cerebras', keyEnv: 'CEREBRAS_API_KEY', base: 'https://api.cerebras.ai/v1', modelEnv: 'CEREBRAS_MODEL', models: [], needsModel: true },
   { name: 'GitHub Models', keyEnv: 'GITHUB_MODELS_TOKEN', base: 'https://models.github.ai/inference', modelEnv: 'GITHUB_MODELS_MODEL', models: ['openai/gpt-4o-mini'] },
@@ -158,7 +158,7 @@ export function configuredProviders(): Provider[] {
 
   // 1. Google Gemini — two models, each with its own free quota.
   if (env.GEMINI_API_KEY) {
-    const models = list(env.GEMINI_MODEL).length ? list(env.GEMINI_MODEL) : ['gemini-2.5-flash', 'gemini-2.5-flash-lite']
+    const models = list(env.GEMINI_MODEL).length ? list(env.GEMINI_MODEL) : ['gemini-3.8-flash', 'gemini-3.5-flash-lite']
     models.forEach((modelName, i) =>
       out.push({
         name: i === 0 ? 'Gemini' : 'Gemini (' + modelName + ')',

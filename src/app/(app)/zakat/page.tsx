@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import ZakatCauses from '@/components/ZakatCauses'
 
 // Nisab: 85 g of gold or 595 g of silver (the commonly cited modern equivalents of 20 mithqal / 200 dirham; some scholars use slightly different figures).
 // Zakat due is 2.5% of net zakatable wealth held for a full lunar year, if at or above nisab.
@@ -144,6 +145,8 @@ export default function ZakatPage() {
         Zakat applies to wealth held for one full lunar year. Scholars differ on details (jewellery, retirement funds, etc.) —
         consult a qualified scholar for your situation.
       </p>
+
+      <ZakatCauses />
     </div>
   )
 }

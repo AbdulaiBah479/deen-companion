@@ -64,6 +64,9 @@ function Card({ h, book, rtl }: { h: Hadith; book: string; rtl: boolean }) {
       <div className="flex items-center gap-4 mt-3 text-sm font-semibold text-[#0F766E]">
         <button onClick={copy}>📋 Copy</button>
         <button onClick={share}>📤 Share</button>
+        <Link href={`/report?cat=content&ref=${encodeURIComponent(ref)}&from=${encodeURIComponent('/hadith?book=' + book + '&number=' + h.hadithnumber)}`} className="text-gray-500 font-normal text-xs" aria-label={`Report a mistake in ${ref}`}>
+          ⚑ Report
+        </Link>
         {note && (
           <span className="text-xs text-gray-500" role="status">
             {note}

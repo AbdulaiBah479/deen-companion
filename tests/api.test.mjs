@@ -344,6 +344,56 @@ ok('validation: oversize message -> 400', (await askPatient('a'.repeat(2500))).s
   ok('watchdog: a dead shared store is noticed and reported (the app itself carries on)', w1.checks.find((c) => c.id === 'redis')?.status === 'down' || w1.checks.find((c) => c.id === 'redis')?.status === 'degraded', JSON.stringify(w1.checks.find((c) => c.id === 'redis')))
 }
 
+// ───────── reports, zakat causes, ruqyah verses ─────────
+{
+  const KEY = 'test-admin-key-0123456789-abcdefghij'
+  // reports use their own pretend visitor addresses, so this test cannot use up the real report allowance of the browser tests
+  const post = (path, body, headers = {}) => fetch(`${APP}${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...(path === '/api/report' ? { 'X-Forwarded-For': '203.0.113.50' } : {}), ...headers }, body: JSON.stringify(body) })
+  const login = await post('/api/admin/login', { key: KEY })
+  const jar = (login.headers.get('set-cookie') || '').split(';')[0]
+  const ah = { Cookie: jar }
+
+  // reports
+  ok('report: a too-short or topic-less report is refused', (await post('/api/report', { category: 'bug', message: 'short' })).status === 400 && (await post('/api/report', { message: 'This is long enough but has no topic.' })).status === 400)
+  const sent = await post('/api/report', { category: 'content', message: 'The translation shown for this verse has a typing mistake.', page: '/quran/2', ref: 'Quran 2:255', contact: 'tester@example.com' })
+  ok('report: a proper report is accepted', sent.status === 200 && (await sent.json()).ok === true)
+  const rl = await (await fetch(`${APP}/api/admin/reports`, { headers: ah })).json()
+  const mine = rl.reports?.find((r) => r.message.includes('typing mistake'))
+  ok('report: it appears in the control room as open, with its page, reference and contact', !!mine && mine.status === 'open' && mine.page === '/quran/2' && mine.ref === 'Quran 2:255' && mine.contact === 'tester@example.com', JSON.stringify(mine))
+  ok('report: the list is closed to visitors', (await fetch(`${APP}/api/admin/reports`)).status === 401)
+  ok('report: the owner can mark it as being looked at, then resolved', (await (await post('/api/admin/reports', { id: mine.id, status: 'looking' }, ah)).json()).ok === true && (await (await fetch(`${APP}/api/admin/reports`, { headers: ah })).json()).reports.find((r) => r.id === mine.id).status === 'looking' && (await (await post('/api/admin/reports', { id: mine.id, status: 'resolved' }, ah)).json()).ok === true)
+  ok('report: a bad id or status is refused', (await post('/api/admin/reports', { id: 'zz', status: 'open' }, ah)).status === 400 && (await post('/api/admin/reports', { id: mine.id, status: 'banana' }, ah)).status === 400)
+  ok('report: the owner can remove it', (await (await fetch(`${APP}/api/admin/reports?id=${mine.id}`, { method: 'DELETE', headers: ah })).json()).ok === true && !(await (await fetch(`${APP}/api/admin/reports`, { headers: ah })).json()).reports.some((r) => r.id === mine.id))
+  const flood = []
+  for (let i = 0; i < 8; i++) flood.push((await post('/api/report', { category: 'idea', message: 'Please add a feature number ' + i + ' to the app.' }, { 'X-Forwarded-For': '203.0.113.51' })).status)
+  ok('report: sending many in a row is limited (429) so nobody can flood the owner', flood.includes(429) && flood.slice(0, 3).every((s) => s === 200 || s === 429), flood.join())
+
+  // zakat causes
+  const pub = await (await fetch(`${APP}/api/causes`)).json()
+  ok('causes: visitors see the starter list (Gaza, orphans…) before any editing', pub.causes?.length >= 6 && pub.causes.some((c) => c.id === 'gaza-relief') && pub.causes.some((c) => c.id === 'orphans'))
+  ok('causes: the editor is closed to visitors', (await fetch(`${APP}/api/admin/causes`)).status === 401 && (await post('/api/admin/causes', { action: 'customize' })).status === 401)
+  const before = await (await fetch(`${APP}/api/admin/causes`, { headers: ah })).json()
+  ok('causes: the owner sees it is still the starter list and can edit', before.customized === false && before.canEdit === true)
+  const add = await post('/api/admin/causes', { cause: { id: 'winter-blankets', title: 'Winter blankets', summary: 'Blankets for families in cold camps.', category: 'refugees', zakat: 'yes', zakatNote: 'Not a fatwa.', links: [{ name: 'Example Charity', url: 'https://example.org/blankets' }], active: true } }, ah)
+  ok('causes: adding one works (and copies the starter list so nothing is lost)', add.status === 200)
+  const after = await (await fetch(`${APP}/api/causes`)).json()
+  ok('causes: visitors now see the new cause as well as the old ones', after.causes.some((c) => c.id === 'winter-blankets') && after.causes.some((c) => c.id === 'gaza-relief'))
+  ok('causes: a link that is not https is refused', (await post('/api/admin/causes', { cause: { id: 'bad', title: 'Bad', summary: 'Bad link.', category: 'other', zakat: 'no', links: [{ name: 'x', url: 'http://example.org' }] } }, ah)).status === 400)
+  await post('/api/admin/causes', { cause: { id: 'winter-blankets', title: 'Winter blankets', summary: 'Blankets for families in cold camps.', category: 'refugees', zakat: 'yes', zakatNote: '', links: [{ name: 'Example Charity', url: 'https://example.org/blankets' }], active: false } }, ah)
+  ok('causes: a hidden cause is not shown to visitors', !(await (await fetch(`${APP}/api/causes`)).json()).causes.some((c) => c.id === 'winter-blankets'))
+  ok('causes: the owner can remove one', (await fetch(`${APP}/api/admin/causes?id=winter-blankets`, { method: 'DELETE', headers: ah })).status === 200 && !(await (await fetch(`${APP}/api/admin/causes`, { headers: ah })).json()).causes.some((c) => c.id === 'winter-blankets'))
+  await post('/api/admin/causes', { action: 'reset' }, ah)
+  ok('causes: resetting returns to the starter list', (await (await fetch(`${APP}/api/admin/causes`, { headers: ah })).json()).customized === false)
+
+  // ruqyah verses
+  const kursi = await (await fetch(`${APP}/api/quran/passage?surah=2&from=255&to=255`)).json()
+  ok('passage: Ayat al-Kursi comes back with Arabic and a translation', kursi.verses?.length === 1 && /[؀-ۿ]{8,}/.test(kursi.verses[0].text_uthmani) && kursi.verses[0].translations[0].text.length > 20)
+  const end = await (await fetch(`${APP}/api/quran/passage?surah=2&from=285&to=286`)).json()
+  ok('passage: the last two verses of Al-Baqarah come back as two verses', end.verses?.length === 2 && end.verses[1].verse_number === 286)
+  ok('passage: bad requests are refused', (await fetch(`${APP}/api/quran/passage?surah=0&from=1`)).status === 400 && (await fetch(`${APP}/api/quran/passage?surah=2&from=5&to=2`)).status === 400 && (await fetch(`${APP}/api/quran/passage?surah=2&from=1&lang=xx`)).status === 400)
+  ok('passage: at most 12 verses at a time', (await (await fetch(`${APP}/api/quran/passage?surah=2&from=1&to=200`)).json()).verses.length === 12)
+}
+
 // 9. The rate limiter protects free quotas from a single heavy visitor
 let limited = 0
 for (let i = 0; i < 20; i++) if ((await ask('salaam ' + i)).status === 429) limited++

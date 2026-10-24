@@ -195,7 +195,7 @@ http
             const e = redis.kv.get(key)
             return { result: e && (!e.exp || e.exp > now) ? e.v : null }
           }
-          if (cmd === 'DEL') return { result: redis.kv.delete(key) ? 1 : 0 }
+          if (cmd === 'DEL') return { result: [redis.kv.delete(key), redis.lists.delete(key), redis.hashes.delete(key), redis.sets.delete(key)].some(Boolean) ? 1 : 0 }
           if (cmd === 'SADD') { const set = redis.sets.get(key) ?? new Set(); for (const m of args) set.add(String(m)); redis.sets.set(key, set); return { result: 1 } }
           if (cmd === 'SREM') { for (const m of args) redis.sets.get(key)?.delete(String(m)); return { result: 1 } }
           if (cmd === 'SMEMBERS') return { result: [...(redis.sets.get(key) ?? [])] }
@@ -208,6 +208,7 @@ http
           if (cmd === 'HSET') { const h = redis.hashes.get(key) ?? new Map(); for (let i = 0; i + 1 < args.length; i += 2) h.set(String(args[i]), String(args[i + 1])); redis.hashes.set(key, h); return { result: 1 } }
           if (cmd === 'HGET') return { result: redis.hashes.get(key)?.get(String(args[0])) ?? null }
           if (cmd === 'HGETALL') return { result: [...(redis.hashes.get(key) ?? new Map())].flat() }
+          if (cmd === 'RPUSH') { const l = redis.lists.get(key) ?? []; for (const m of args) l.push(String(m)); redis.lists.set(key, l); return { result: l.length } }
           if (cmd === 'LPUSH') { const l = redis.lists.get(key) ?? []; l.unshift(String(args[0])); redis.lists.set(key, l); return { result: l.length } }
           if (cmd === 'LTRIM') { const l = redis.lists.get(key) ?? []; redis.lists.set(key, l.slice(Number(args[0]), Number(args[1]) + 1)); return { result: 'OK' } }
           if (cmd === 'LRANGE') return { result: (redis.lists.get(key) ?? []).slice(Number(args[0]), Number(args[1]) + 1) }

@@ -1,4 +1,4 @@
-import { qiblaBearing, distanceToKaaba, compassHeading, turnBetween } from '../src/lib/qibla.ts'
+import { qiblaBearing, distanceToKaaba, compassHeading, turnBetween, HeadingFilter, unwrap } from '../src/lib/qibla.ts'
 import { mulberry32, hashSeed, shuffle } from '../src/lib/random.ts'
 import { newStoredCard, review, isDue, previewIntervals } from '../src/lib/srs.ts'
 let fails = 0
@@ -43,4 +43,23 @@ ok('preview gives labels for all 4 grades', ['again', 'hard', 'good', 'easy'].ev
 ok('compass: phone flat, facing north/east/south/west', near(compassHeading(0, 0, 0), 0, 0.5) && near(compassHeading(270, 0, 0), 90, 0.5) && near(compassHeading(180, 0, 0), 180, 0.5) && near(compassHeading(90, 0, 0), 270, 0.5))
 ok('compass: phone held upright (how people hold it), facing north and east', near(compassHeading(0, 90, 0), 0, 0.5) && near(compassHeading(270, 90, 0), 90, 0.5))
 ok('compass: turn between headings takes the short way round', turnBetween(350, 10) === 20 && turnBetween(10, 350) === -20 && turnBetween(90, 90) === 0 && Math.abs(turnBetween(0, 180)) === 180)
+{
+  // a phone held still near 90° with ±3° of jitter: the shown heading must barely move
+  const f = new HeadingFilter()
+  let seed = 7
+  const rnd = () => ((seed = (seed * 1664525 + 1013904223) % 4294967296) / 4294967296) * 2 - 1
+  const shown: number[] = []
+  for (let i = 0; i < 200; i++) shown.push(f.push(90 + rnd() * 3))
+  const settled = shown.slice(40)
+  ok('compass filter: held still, the needle stays put (moves less than 2° while the raw reading wobbles 6°)', Math.max(...settled) - Math.min(...settled) < 2, (Math.max(...settled) - Math.min(...settled)).toFixed(2))
+  let out = 0
+  for (let i = 0; i < 12; i++) out = f.push(180)
+  ok('compass filter: a real turn of 90° is followed within a dozen readings', Math.abs(turnBetween(out, 180)) < 4, out.toFixed(1))
+  const g = new HeadingFilter()
+  const cross: number[] = []
+  for (let i = 0; i < 60; i++) cross.push(g.push(i % 2 ? 359 : 1))
+  ok('compass filter: wobble across north (359°/1°) averages to north, not south', cross.slice(20).every((v) => Math.min(v, 360 - v) < 3), cross.slice(-3).map((v) => v.toFixed(1)).join())
+  ok('dial: crossing north keeps turning the same way (no spin back)', Math.abs(unwrap(359, 1) - 361) < 1e-9 && Math.abs(unwrap(361, 359) - 359) < 1e-9 && Math.abs(unwrap(-1, 2) - 2) < 1e-9 && Math.abs(unwrap(10, 170) - 170) < 1e-9)
+}
+
 console.log(fails ? `\n${fails} FAILED` : '\nALL PASSED'); process.exit(fails ? 1 : 0)

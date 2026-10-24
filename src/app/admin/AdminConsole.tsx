@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import AdminCauses from './AdminCauses'
 
 type Status = 'up' | 'degraded' | 'down'
 type Component = { status: Status; since: number; checkedAt: number; detail: string; ms?: number }
@@ -19,6 +20,7 @@ type Overview = {
   reminders: { configured: boolean; devices: number | null; adminDevices: number }
   config: Record<string, boolean | number>
 }
+type ReportRow = { id: string; at: number; category: string; message: string; page: string; ref?: string; contact?: string; status: 'open' | 'looking' | 'resolved' }
 type Users = { configured: boolean; total?: number; error?: string; users?: { id: string; email: string; name: string; created: string; lastSignIn: string | null; confirmed: boolean }[] }
 
 const LABELS: Record<string, string> = {
@@ -67,6 +69,7 @@ export default function AdminConsole() {
   const [error, setError] = useState('')
   const [data, setData] = useState<Overview | null>(null)
   const [users, setUsers] = useState<Users | null>(null)
+  const [reports, setReports] = useState<ReportRow[] | null>(null)
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState('')
 
@@ -80,6 +83,10 @@ export default function AdminConsole() {
       fetch('/api/admin/users', { cache: 'no-store' })
         .then((r) => r.json())
         .then(setUsers)
+        .catch(() => {})
+      fetch('/api/admin/reports', { cache: 'no-store' })
+        .then((r) => r.json())
+        .then((d) => setReports(d.reports ?? []))
         .catch(() => {})
     } catch {
       setError('Could not reach the server.')
@@ -138,6 +145,16 @@ export default function AdminConsole() {
     } catch (e) {
       setNote(e instanceof Error ? e.message : 'Could not turn on alerts.')
     }
+  }
+
+  async function setReport(id: string, status: ReportRow['status']) {
+    await fetch('/api/admin/reports', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, status }) })
+    setReports((r) => (r ? r.map((x) => (x.id === id ? { ...x, status } : x)) : r))
+  }
+  async function dropReport(id: string) {
+    if (!confirm('Remove this report?')) return
+    await fetch('/api/admin/reports?id=' + id, { method: 'DELETE' })
+    setReports((r) => (r ? r.filter((x) => x.id !== id) : r))
   }
 
   async function removeUser(id: string, email: string) {
@@ -278,6 +295,38 @@ export default function AdminConsole() {
             </>
           )}
         </div>
+      </section>
+
+      <section aria-labelledby="h-rep">
+        <h2 id="h-rep" className="font-bold mb-2">Reports from users{reports ? ` (${reports.filter((r) => r.status !== 'resolved').length} open)` : ''}</h2>
+        <div className="bg-white border border-gray-200 rounded-xl p-3 text-sm">
+          {!reports ? 'Loading…' : reports.length === 0 ? <p className="text-gray-600">No reports yet.</p> : (
+            <ul className="divide-y divide-gray-100">
+              {reports.map((r) => (
+                <li key={r.id} className="py-2 space-y-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-bold uppercase text-gray-600">{r.category}</span>
+                    <span className={`text-[11px] px-2 py-0.5 rounded-full ${r.status === 'open' ? 'bg-amber-100 text-amber-800' : r.status === 'looking' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'}`}>{r.status}</span>
+                    <span className="text-xs text-gray-500 ml-auto">{ago(r.at)}</span>
+                  </div>
+                  <p className="whitespace-pre-wrap break-words">{r.message}</p>
+                  <p className="text-xs text-gray-500 break-all">{r.ref ? `About: ${r.ref} · ` : ''}{r.page ? `From: ${r.page} · ` : ''}{r.contact ? `Contact: ${r.contact}` : 'No contact left'}</p>
+                  <div className="flex gap-3 text-xs">
+                    {r.status !== 'looking' && <button onClick={() => setReport(r.id, 'looking')} className="text-[#0F766E] underline">Looking into it</button>}
+                    {r.status !== 'resolved' && <button onClick={() => setReport(r.id, 'resolved')} className="text-[#0F766E] underline">Mark resolved</button>}
+                    {r.status === 'resolved' && <button onClick={() => setReport(r.id, 'open')} className="text-[#0F766E] underline">Reopen</button>}
+                    <button onClick={() => dropReport(r.id)} className="text-red-600 underline ml-auto">Remove</button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </section>
+
+      <section aria-labelledby="h-causes">
+        <h2 id="h-causes" className="font-bold mb-2">Where donations go (Zakat page)</h2>
+        <AdminCauses />
       </section>
 
       <section aria-labelledby="h-err">

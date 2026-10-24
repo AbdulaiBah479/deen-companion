@@ -28,8 +28,10 @@ const ITEMS = [
   { href: '/mosques', icon: '🕌', title: 'Find a Mosque', desc: 'Nearby, from OpenStreetMap', kids: false },
   { href: '/qibla', icon: '🧭', title: 'Qibla Finder', desc: 'Compass to the Kaaba', kids: false },
   { href: '/zakat', icon: '💰', title: 'Zakat Calculator', desc: 'Live nisab & amount due', kids: false },
+  { href: '/ruqyah', icon: '🛡️', title: 'Ruqyah', desc: 'Protection & healing from the Quran and Sunnah', kids: false },
   { href: '/ramadan', icon: '🌙', title: 'Ramadan Tracker', desc: 'Fasting & Quran goals', kids: true },
   { href: '/donate', icon: '💚', title: 'Sadaqah Journal', desc: 'Track your giving', kids: false },
+  { href: '/report', icon: '⚑', title: 'Report a problem', desc: 'A mistake, a bug, or an idea', kids: false },
   { href: '/settings', icon: '⚙️', title: 'Settings', desc: 'Language, kids mode, backup', kids: true },
 ]
 

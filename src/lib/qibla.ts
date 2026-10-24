@@ -44,3 +44,54 @@ export function compassHeading(alpha: number, beta: number, gamma: number): numb
 export function turnBetween(from: number, to: number): number {
   return ((((to - from) % 360) + 540) % 360) - 180
 }
+
+// Phone compasses jitter by a few degrees even when held still. This steadies them:
+//  • readings are averaged as directions (so 359° and 1° average to 0°, not 180°),
+//  • small wobbles are ignored (a dead-band), so the needle stays put when you stay put,
+//  • a real turn is followed quickly, so it never feels laggy.
+export class HeadingFilter {
+  private x = 0
+  private y = 0
+  private has = false
+  private shown: number | null = null
+  private slow: number
+  private fast: number
+  private deadband: number
+  constructor(slow = 0.12, fast = 0.5, deadband = 1.5) {
+    this.slow = slow
+    this.fast = fast
+    this.deadband = deadband
+  }
+
+  // Feed a raw heading; returns the steadied heading to show (changes only when the move is worth showing).
+  push(h: number): number {
+    const r = rad(h)
+    const cx = Math.cos(r)
+    const cy = Math.sin(r)
+    if (!this.has || this.shown === null) {
+      this.x = cx
+      this.y = cy
+      this.has = true
+      this.shown = (h + 360) % 360
+      return this.shown
+    }
+    const away = Math.abs(turnBetween(this.shown, h))
+    const k = away > 25 ? this.fast : away > 8 ? (this.slow + this.fast) / 2 : this.slow
+    this.x += (cx - this.x) * k
+    this.y += (cy - this.y) * k
+    const smooth = (deg(Math.atan2(this.y, this.x)) + 360) % 360
+    if (Math.abs(turnBetween(this.shown, smooth)) >= this.deadband) this.shown = smooth
+    return this.shown
+  }
+
+  reset() {
+    this.has = false
+    this.shown = null
+  }
+}
+
+// Keeps a dial angle continuous: going from 359° to 1° adds 2°, instead of spinning back 358°.
+export function unwrap(previousAngle: number, nextHeading: number): number {
+  const prevHeading = ((previousAngle % 360) + 360) % 360
+  return previousAngle + turnBetween(prevHeading, nextHeading)
+}

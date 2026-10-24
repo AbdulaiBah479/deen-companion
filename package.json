@@ -14,7 +14,7 @@
     "data": "node scripts/fetch-data.mjs",
     "test:search": "node --import ./tests/register-ts.mjs --experimental-strip-types --no-warnings tests/search.test.mts",
     "test:sync": "node --import ./tests/register-ts.mjs --experimental-strip-types --no-warnings tests/sync.test.mts",
-    "test": "npm run test:logic && npm run test:search && npm run test:sync && npm run test:resilience && npm run test:learn && npm run test:recite && npm run test:life && npm run test:guides && npm run test:fetch && npm run test:reels && npm run test:location && npm run test:stories && npm run test:library && npm run test:daily && npm run test:lectures && npm run test:heritage && npm run test:security && npm run test:providers && npm run test:ratelimit && npm run test:errors && npm run test:prayercalc && npm run test:offline && npm run test:push && npm run test:sleep && npm run test:autopilot",
+    "test": "npm run test:logic && npm run test:search && npm run test:sync && npm run test:resilience && npm run test:learn && npm run test:recite && npm run test:life && npm run test:guides && npm run test:fetch && npm run test:reels && npm run test:location && npm run test:stories && npm run test:library && npm run test:daily && npm run test:lectures && npm run test:heritage && npm run test:security && npm run test:providers && npm run test:ratelimit && npm run test:errors && npm run test:prayercalc && npm run test:offline && npm run test:push && npm run test:sleep && npm run test:autopilot && npm run test:playback && npm run test:causes",
     "prebuild": "node scripts/fetch-data.mjs",
     "test:resilience": "node --import ./tests/register-ts.mjs --experimental-strip-types --no-warnings tests/resilience.test.mts",
     "test:learn": "node --import ./tests/register-ts.mjs --experimental-strip-types --no-warnings tests/learn.test.mts",
@@ -49,7 +49,9 @@
     "vapid": "node scripts/vapid.mjs",
     "shots": "node tests/shots.mjs",
     "test:sleep": "node --import ./tests/register-ts.mjs --experimental-strip-types --no-warnings tests/sleep.test.mts",
-    "test:autopilot": "node --import ./tests/register-ts.mjs --experimental-strip-types --no-warnings tests/autopilot.test.mts"
+    "test:autopilot": "node --import ./tests/register-ts.mjs --experimental-strip-types --no-warnings tests/autopilot.test.mts",
+    "test:playback": "node --import ./tests/register-ts.mjs --experimental-strip-types --no-warnings tests/playback.test.mts",
+    "test:causes": "node --import ./tests/register-ts.mjs --experimental-strip-types --no-warnings tests/causes.test.mts"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",

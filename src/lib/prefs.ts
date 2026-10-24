@@ -1,5 +1,6 @@
 'use client'
 
+import type { Pause } from './playback'
 import { useStored } from './storage'
 
 export type Theme = 'system' | 'light' | 'dark' | 'sepia'
@@ -13,6 +14,8 @@ export type Prefs = {
   showTranslationInReading: boolean
   continuous: boolean // keep playing into the next surah
   repeat: 'off' | 'one'
+  repeatEach: number // practice: times each verse is heard (1 = once, 0 = until stopped)
+  pause: Pause // practice: wait after each verse (none / 2 seconds / "your turn")
   rate: number
 }
 
@@ -24,6 +27,8 @@ export const DEFAULT_PREFS: Prefs = {
   showTranslationInReading: false,
   continuous: true,
   repeat: 'off',
+  repeatEach: 1,
+  pause: 'none',
   rate: 1,
 }
 

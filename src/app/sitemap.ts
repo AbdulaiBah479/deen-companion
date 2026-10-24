@@ -6,7 +6,7 @@ import { STORIES } from '@/lib/stories'
 const site = (process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000').replace(/\/$/, '')
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const fixed = ['/dashboard', '/quran', '/prayer', '/reels', '/learn', '/companion', '/stories', '/heritage', '/library', '/lectures', '/quiz', '/games', '/hadith', '/duas', '/names', '/dhikr', '/qibla', '/zakat', '/calendar', '/guides', '/ramadan', '/more', '/legal/privacy', '/legal/terms', '/legal/credits']
+  const fixed = ['/dashboard', '/quran', '/prayer', '/reels', '/learn', '/companion', '/stories', '/heritage', '/library', '/lectures', '/quiz', '/games', '/hadith', '/duas', '/names', '/dhikr', '/qibla', '/zakat', '/ruqyah', '/calendar', '/guides', '/ramadan', '/more', '/legal/privacy', '/legal/terms', '/legal/credits']
   const surahs = Array.from({ length: 114 }, (_, i) => `/quran/${i + 1}`)
   const people = HERITAGE.map((h) => `/heritage/${h.id}`)
   const stories = STORIES.map((s) => `/stories/${s.id}`)

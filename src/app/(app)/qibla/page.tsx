@@ -37,6 +37,12 @@ export default function QiblaPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [placeReady])
 
+  // Android and desktop browsers need no permission, so the compass starts by itself. iPhone must be asked (a tap).
+  useEffect(() => {
+    const DOE = window.DeviceOrientationEvent as unknown as { requestPermission?: () => Promise<string> } | undefined
+    if (DOE && typeof DOE.requestPermission !== 'function') void enableCompass()
+  }, [])
+
   async function enableCompass() {
     const DOE = window.DeviceOrientationEvent as unknown as { requestPermission?: () => Promise<string> }
     if (typeof DOE?.requestPermission === 'function') {
@@ -57,6 +63,11 @@ export default function QiblaPage() {
       const ev = e as OrientationEventWithCompass
       if (typeof ev.webkitCompassHeading === 'number') push(ev.webkitCompassHeading)
       else if (ev.alpha !== null && ev.beta !== null && ev.gamma !== null && (e.type === 'deviceorientationabsolute' || ev.absolute === true)) push(compassHeading(ev.alpha, ev.beta, ev.gamma))
+    }
+    handlerRef.current = handler
+    if (handlerRef.current && handlerRef.current !== handler) {
+      window.removeEventListener('deviceorientationabsolute', handlerRef.current)
+      window.removeEventListener('deviceorientation', handlerRef.current)
     }
     handlerRef.current = handler
     window.addEventListener('deviceorientationabsolute', handler)

@@ -30,6 +30,9 @@ const STORIES = [
 ]
 
 export default function HomePage() {
+  // Until accounts are switched on, every button goes straight into the app (a sign-up form would lead nowhere).
+  const accounts = !!process.env.NEXT_PUBLIC_SUPABASE_URL && !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  const join = accounts ? '/signup' : '/dashboard'
   return (
     <main className="min-h-screen bg-[#F8FAFC]">
       <nav className="bg-white border-b border-gray-200 px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-2 sticky top-0 z-50">
@@ -41,12 +44,13 @@ export default function HomePage() {
         <div className="flex gap-2 sm:gap-3 shrink-0">
           <Link
             href="/login"
+            hidden={!accounts}
             className="hidden sm:inline-block px-4 py-2 whitespace-nowrap text-[#0F766E] border border-[#0F766E] rounded-xl text-sm font-semibold hover:bg-[#0F766E] hover:text-white transition-all"
           >
             Sign In
           </Link>
           <Link
-            href="/signup"
+            href={join}
             className="px-3 sm:px-4 py-2 whitespace-nowrap bg-[#0F766E] text-white rounded-xl text-sm font-semibold hover:bg-[#0D5C57] transition-all"
           >
             <span className="sm:hidden">Get started</span>
@@ -71,7 +75,7 @@ export default function HomePage() {
           </p>
           <div className="flex flex-wrap justify-center gap-3">
             <Link
-              href="/signup"
+              href={join}
               className="bg-[#D4AF37] text-[#1a0e00] px-8 py-3 rounded-xl font-bold text-lg hover:bg-[#C9A227] transition-all"
             >
               Start For Free ✨
@@ -83,7 +87,7 @@ export default function HomePage() {
               Open App →
             </Link>
           </div>
-          <p className="sm:hidden mt-4 text-sm opacity-90">
+          <p className="sm:hidden mt-4 text-sm opacity-90" hidden={!accounts}>
             Already have an account?{' '}
             <Link href="/login" className="underline font-semibold">
               Sign in

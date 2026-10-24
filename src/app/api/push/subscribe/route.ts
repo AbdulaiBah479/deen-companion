@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { track } from '@/lib/ops'
 import { parseReminder, pushConfigured, saveReminder } from '@/lib/push'
 import { clientIp, rateLimit } from '@/lib/ratelimit'
 
 // POST /api/push/subscribe — switch prayer reminders on (or update them). Body: { subscription, lat, lng, tz, method, prayers, leadMin }
 export async function POST(request: NextRequest) {
+  track('push.subscribe')
   if (!pushConfigured()) return NextResponse.json({ error: 'Reminders are not set up on this server' }, { status: 503 })
   const limit = await rateLimit(`push-sub:${clientIp(request.headers)}`, 10, 60_000)
   if (!limit.ok) return NextResponse.json({ error: 'Too many requests' }, { status: 429 })

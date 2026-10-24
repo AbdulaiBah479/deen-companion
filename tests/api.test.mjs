@@ -297,6 +297,53 @@ ok('validation: oversize message -> 400', (await askPatient('a'.repeat(2500))).s
   ok('reminders: what is stored is only the push address, a ~100 m position, method and choices (no name, no email)', rec.length >= 1 && rec.every((r) => Object.keys(r).sort().join() === 'created,lat,leadMin,lng,method,prayers,sub,tz' && String(r.lat).split('.')[1].length <= 3 && Object.keys(r.sub).sort().join() === 'endpoint,keys'), JSON.stringify(rec[0]).slice(0, 200))
 }
 
+// ───────── admin control room and the autopilot ─────────
+{
+  const KEY = 'test-admin-key-0123456789-abcdefghij'
+  const CRON = 'test-cron-secret-0123456789'
+  const json = (path, init = {}) => fetch(`${APP}${path}`, init)
+  ok('admin: the data is closed to visitors without a session', (await json('/api/admin/overview')).status === 401 && (await json('/api/admin/users')).status === 401)
+  ok('admin: actions are closed too', (await json('/api/admin/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'test' }) })).status === 401)
+  const bad = await json('/api/admin/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: 'nope' }) })
+  ok('admin: a wrong key is refused and sets no cookie', bad.status === 401 && !bad.headers.get('set-cookie'))
+  const good = await json('/api/admin/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: KEY }) })
+  const cookie = good.headers.get('set-cookie') || ''
+  ok('admin: the right key gives a safe cookie (HTTP-only, same-site strict)', good.status === 200 && /deen_admin=/.test(cookie) && /HttpOnly/i.test(cookie) && /SameSite=strict/i.test(cookie))
+  const jar = cookie.split(';')[0]
+  const ov = await json('/api/admin/overview', { headers: { Cookie: jar } })
+  const ovj = await ov.json()
+  ok('admin: signed in, the overview loads with config, AI providers and counters', ov.status === 200 && ovj.config && Array.isArray(ovj.ai.providers) && Array.isArray(ovj.counters) && ovj.reminders.configured === true, Object.keys(ovj).join())
+  ok('admin: the overview never contains a secret', !JSON.stringify(ovj).includes(KEY) && !JSON.stringify(ovj).includes(CRON) && !JSON.stringify(ovj).includes('test-redis-token') && !JSON.stringify(ovj).includes('lfeaVODTqLBiGuz'))
+  ok('admin: a forged or foreign-site request is refused', (await json('/api/admin/action', { method: 'POST', headers: { Cookie: jar, Origin: 'https://evil.example', 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'test' }) })).status === 403 && (await json('/api/admin/overview', { headers: { Cookie: 'deen_admin=1999999999.AAAA' } })).status === 401)
+  ok('admin: unknown action refused', (await json('/api/admin/action', { method: 'POST', headers: { Cookie: jar, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'format-disk' }) })).status === 400)
+  const res = await (await json('/api/admin/action', { method: 'POST', headers: { Cookie: jar, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'reset-ai' }) })).json()
+  ok('admin: "clear AI cool-downs" works', res.ok === true)
+  ok('admin: users list says accounts are not set up when Supabase is absent', (await (await json('/api/admin/users', { headers: { Cookie: jar } })).json()).configured === false)
+
+  // alerts to the owner's phone: register a device, then a test alert reaches the fake push service
+  const { createECDH: mkEcdh, randomBytes: rnd } = await import('node:crypto')
+  const ecdhAdmin = mkEcdh('prime256v1')
+  ecdhAdmin.generateKeys()
+  const sub = { endpoint: LLM + '/push/admin-phone', keys: { p256dh: ecdhAdmin.getPublicKey().toString('base64url'), auth: rnd(16).toString('base64url') } }
+  ok('admin alerts: registering a phone needs the admin session', (await json('/api/admin/alerts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(sub) })).status === 401)
+  ok('admin alerts: a foreign push address is refused', (await json('/api/admin/alerts', { method: 'POST', headers: { Cookie: jar, 'Content-Type': 'application/json' }, body: JSON.stringify({ ...sub, endpoint: 'https://evil.example/x' }) })).status === 400)
+  ok('admin alerts: a real device is accepted', (await json('/api/admin/alerts', { method: 'POST', headers: { Cookie: jar, 'Content-Type': 'application/json' }, body: JSON.stringify(sub) })).status === 200)
+  const test = await (await json('/api/admin/action', { method: 'POST', headers: { Cookie: jar, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'test' }) })).json()
+  ok('admin alerts: the test alert reaches the registered phone and the chat webhook', test.ok === true && test.push === 1 && test.webhook === true, JSON.stringify(test))
+
+  // the watchdog
+  ok('watchdog: refuses callers without the scheduler secret', (await json('/api/cron/watchdog', { method: 'POST' })).status === 401 && (await json('/api/cron/watchdog', { method: 'POST', headers: { Authorization: 'Bearer wrong-wrong-wrong-wrong' } })).status === 401)
+  const w = await (await json('/api/cron/watchdog', { method: 'POST', headers: { Authorization: `Bearer ${CRON}` } })).json()
+  ok('watchdog: runs the checks and says all is fine', w.ok === true && w.checks.some((c) => c.id === 'app' && c.status === 'up') && w.checks.some((c) => c.id === 'redis' && c.status === 'up') && w.checks.some((c) => c.id === 'ai'), JSON.stringify(w).slice(0, 300))
+  const ov2 = await (await json('/api/admin/overview', { headers: { Cookie: jar } })).json()
+  ok('watchdog: what it saw is kept and shown in the control room', ov2.statuses.app?.status === 'up' && ov2.statuses.redis?.status === 'up' && ov2.incidents.length > 0)
+  // simulate the shared store going down: the watchdog must say so (twice, since one bad look is not announced)
+  await fetch('http://localhost:4010/redis-down', { method: 'POST' })
+  const w1 = await (await json('/api/cron/watchdog', { method: 'POST', headers: { Authorization: `Bearer ${CRON}` } })).json()
+  await fetch('http://localhost:4010/redis-down', { method: 'POST' })
+  ok('watchdog: a dead shared store is noticed and reported (the app itself carries on)', w1.checks.find((c) => c.id === 'redis')?.status === 'down' || w1.checks.find((c) => c.id === 'redis')?.status === 'degraded', JSON.stringify(w1.checks.find((c) => c.id === 'redis')))
+}
+
 // 9. The rate limiter protects free quotas from a single heavy visitor
 let limited = 0
 for (let i = 0; i < 20; i++) if ((await ask('salaam ' + i)).status === 429) limited++

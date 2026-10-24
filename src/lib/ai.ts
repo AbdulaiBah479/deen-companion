@@ -15,6 +15,8 @@ import { ProviderChain, ProviderError, type ChatTurn, type Provider } from './ai
 import { extractiveAnswer } from './extractive'
 import { createHash } from 'node:crypto'
 import { redis, redisConfigured } from './redis'
+import { readDiscoveredModels, recordProviderStat, track, writeDiscoveredModels } from './ops'
+import { discoverModels } from './model-discovery'
 
 export type { ChatTurn } from './ai-chain'
 
@@ -151,6 +153,37 @@ export const COMPAT_PROVIDERS: Compat[] = [
 
 const list = (v: string | undefined) => (v || '').split(',').map((m) => m.trim()).filter(Boolean)
 
+// Models the watchdog found working today (see model-discovery.ts). They fill in only where you have not set your own *_MODEL.
+let discovered: Record<string, string[]> = {}
+let discoveredAt = 0
+export function setDiscoveredModels(m: Record<string, string[]>) {
+  discovered = m
+  discoveredAt = Date.now()
+}
+async function refreshDiscovered() {
+  if (Date.now() - discoveredAt < 5 * 60_000) return
+  discoveredAt = Date.now()
+  try {
+    const m = await readDiscoveredModels()
+    if (Object.keys(m).length) discovered = m
+  } catch {}
+}
+
+// Everything failed: perhaps a provider retired the model we ask for. Look up what exists today (at most every 10 minutes
+// per server, in the background, so the person waiting is not slowed down).
+let lastHeal = 0
+export async function healModels(force = false): Promise<{ found: Record<string, string[]>; notes: string[] }> {
+  if (!force && Date.now() - lastHeal < 10 * 60_000) return { found: {}, notes: ['skipped: tried recently'] }
+  lastHeal = Date.now()
+  const result = await discoverModels(process.env)
+  if (Object.keys(result.found).length) {
+    setDiscoveredModels({ ...discovered, ...result.found })
+    await writeDiscoveredModels(result.found).catch(() => {})
+    chain.reset()
+  }
+  return result
+}
+
 export function configuredProviders(): Provider[] {
   const env = process.env
   const out: Provider[] = []
@@ -160,7 +193,7 @@ export function configuredProviders(): Provider[] {
 
   // 1. Google Gemini — two models, each with its own free quota.
   if (env.GEMINI_API_KEY) {
-    const models = list(env.GEMINI_MODEL).length ? list(env.GEMINI_MODEL) : ['gemini-3.8-flash', 'gemini-3.5-flash-lite', 'gemini-3.1-flash-lite']
+    const models = list(env.GEMINI_MODEL).length ? list(env.GEMINI_MODEL) : (discovered.Gemini ?? ['gemini-3.8-flash', 'gemini-3.5-flash-lite', 'gemini-3.1-flash-lite'])
     models.forEach((modelName, i) =>
       out.push({
         name: i === 0 ? 'Gemini' : 'Gemini (' + modelName + ')',
@@ -181,7 +214,7 @@ export function configuredProviders(): Provider[] {
   const addCompat = (p: Compat) => {
     const key = env[p.keyEnv]
     if (!key || (p.optIn && !/^(on|1|true|yes)$/i.test(key))) return
-    const models = list(env[p.modelEnv]).length ? list(env[p.modelEnv]) : p.models
+    const models = list(env[p.modelEnv]).length ? list(env[p.modelEnv]) : (discovered[p.name] ?? p.models)
     if (!models.length) return // e.g. Cerebras needs you to pick a model
     models.forEach((model, i) =>
       out.push({
@@ -257,7 +290,7 @@ function spendOne() {
   budget.used++
 }
 
-const chain = new ProviderChain([], { timeoutMs: 15_000, hedgeMs: 3_500 })
+const chain = new ProviderChain([], { timeoutMs: 15_000, hedgeMs: 3_500, onResult: (name, ok, ms, error) => void recordProviderStat(name, ok, ms, error) })
 const cache = new AnswerCache<{ answer: string; provider: string }>(300, 24 * 3600_000)
 
 // Which providers are configured, which are resting after hitting a limit, and how many answers are cached.
@@ -303,6 +336,8 @@ export function prepareAI(opts: AskOptions) {
 
 export async function askAI(opts: AskOptions): Promise<AIResult> {
   const { lang, sources, system, history } = prepareAI(opts)
+  track('ai.ask')
+  await refreshDiscovered()
 
   // 1. Cache: a repeated standalone question costs nothing.
   const cacheable = !(opts.history && opts.history.length)
@@ -344,5 +379,23 @@ export async function askAI(opts: AskOptions): Promise<AIResult> {
   }
 
   // 3. Everything is busy: still give a useful, sourced answer instead of an error.
+  if (dailyBudgetLeft()) void healModels().catch(() => {})
   return { answer: extractiveAnswer(sources, 'unavailable'), sources, provider: null, mode: 'sources' }
+}
+
+// For the admin view and the watchdog.
+export function aiPerformance() {
+  return chain.performance()
+}
+
+// One tiny real question to see whether anything can answer right now (the watchdog uses this only when real traffic has not).
+export async function aiCanary(): Promise<{ ok: boolean; provider: string | null; ms: number }> {
+  chain.setProviders(configuredProviders())
+  const t0 = Date.now()
+  const r = await chain.run('You are a health check. Answer in one short sentence.', [{ role: 'user', content: 'Say that all systems are working.' }])
+  return { ok: !!r, provider: r?.provider ?? null, ms: Date.now() - t0 }
+}
+
+export function resetAiCooldowns() {
+  chain.reset()
 }

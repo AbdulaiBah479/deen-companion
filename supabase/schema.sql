@@ -3,7 +3,7 @@
 create extension if not exists "uuid-ossp";
 
 create table profiles (
-  id uuid references auth.users primary key,
+  id uuid references auth.users on delete cascade primary key,
   name text,
   email text,
   avatar_url text,

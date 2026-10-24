@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { errorKey, parseClientError } from '@/lib/error-report'
+import { recordClientError, track } from '@/lib/ops'
 import { clientIp, rateLimit } from '@/lib/ratelimit'
 
 // POST /api/client-error — the browser reports a crash. It is written to the server log (visible in Vercel → Logs) and, if
@@ -22,6 +23,8 @@ export async function POST(request: NextRequest) {
   if (!report) return new NextResponse(null, { status: 400 })
 
   console.error('[client-error]', JSON.stringify(report))
+  track('client-error')
+  void recordClientError(errorKey(report), { kind: report.kind, page: report.page, message: report.message, source: report.source })
 
   const hook = process.env.ERROR_WEBHOOK_URL
   const key = errorKey(report)

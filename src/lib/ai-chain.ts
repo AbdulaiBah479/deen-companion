@@ -41,12 +41,15 @@ type Health = { until: number; fails: number; lastKind?: Failure['kind'] }
 
 export class ProviderChain {
   private health = new Map<string, Health>()
+  private perf = new Map<string, { ok: number; fail: number; ewmaMs: number }>()
+  private onResult?: (name: string, ok: boolean, ms: number, error?: string) => void
   private providers: Provider[]
   private timeoutMs: number
   private hedgeMs: number
   private now: () => number
 
-  constructor(providers: Provider[], opts: { timeoutMs?: number; hedgeMs?: number; now?: () => number } = {}) {
+  constructor(providers: Provider[], opts: { timeoutMs?: number; hedgeMs?: number; now?: () => number; onResult?: (name: string, ok: boolean, ms: number, error?: string) => void } = {}) {
+    this.onResult = opts.onResult
     this.providers = providers
     this.timeoutMs = opts.timeoutMs ?? 20_000
     this.hedgeMs = opts.hedgeMs ?? 3_500
@@ -58,9 +61,44 @@ export class ProviderChain {
     this.providers = providers
   }
 
+  // Providers that are not resting, in the configured order — except that one which keeps failing or is very slow is moved
+  // behind the others (adapting to what is actually working today). With no history the configured order is kept.
   available(): Provider[] {
     const t = this.now()
-    return this.providers.filter((p) => (this.health.get(p.name)?.until ?? 0) <= t)
+    const open = this.providers.filter((p) => (this.health.get(p.name)?.until ?? 0) <= t)
+    const penalty = (p: Provider) => {
+      const s = this.perf.get(p.name)
+      if (!s || s.ok + s.fail < 4) return 0
+      const failRate = s.fail / (s.ok + s.fail)
+      return (failRate > 0.5 ? 100 : failRate > 0.25 ? 30 : 0) + (s.ewmaMs > 9000 ? 20 : s.ewmaMs > 5000 ? 8 : 0)
+    }
+    return open.map((p, i) => ({ p, k: i + penalty(p) })).sort((a, b) => a.k - b.k).map((x) => x.p)
+  }
+
+  // What the chain has learned about each provider this session (for the admin view).
+  performance() {
+    return Object.fromEntries([...this.perf.entries()].map(([k, v]) => [k, { ...v }]))
+  }
+
+  // Forget cool-downs (an admin action, or after the models were refreshed).
+  reset() {
+    this.health.clear()
+  }
+
+  private note(name: string, ok: boolean, ms: number, error?: string) {
+    const s = this.perf.get(name) ?? { ok: 0, fail: 0, ewmaMs: ms }
+    if (ok) {
+      s.ok++
+      s.ewmaMs = Math.round(s.ewmaMs * 0.8 + ms * 0.2)
+    } else s.fail++
+    if (s.ok + s.fail > 60) {
+      s.ok = Math.round(s.ok / 2)
+      s.fail = Math.round(s.fail / 2)
+    }
+    this.perf.set(name, s)
+    try {
+      this.onResult?.(name, ok, ms, error)
+    } catch {}
   }
 
   status() {
@@ -90,6 +128,7 @@ export class ProviderChain {
       const launch = () => {
         if (done || next >= queue.length) return false
         const p = queue[next++]
+        const started = Date.now()
         running++
         if (hedge) clearTimeout(hedge)
         hedge = setTimeout(launch, this.hedgeMs)
@@ -103,9 +142,11 @@ export class ProviderChain {
           .then((answer) => {
             if (!answer || answer.trim().length <= 20) throw new Error('empty answer')
             this.health.delete(p.name) // healthy again
+            this.note(p.name, true, Date.now() - started)
             finish({ answer: answer.trim(), provider: p.name })
           })
           .catch((err) => {
+            this.note(p.name, false, Date.now() - started, err instanceof Error ? err.message : String(err))
             const prev = this.health.get(p.name)
             const fails = (prev?.fails ?? 0) + 1
             const f = classifyFailure(err, fails)

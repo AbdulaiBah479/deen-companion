@@ -180,3 +180,10 @@ Translations keep their translators’ copyright, which is why `./data` is gener
 ## Copyright and licence
 
 © 2026 Abdulai Bah. All rights reserved. This is proprietary software: the code, design and original content may not be copied, modified, redistributed or reused without written permission (see [LICENSE](LICENSE)). Third-party content (Quran text and translations, hadith, Wikipedia text, OpenStreetMap data, videos, open-source libraries) stays under its own terms — see the in-app "Sources & credits" page.
+
+## Control room and autopilot
+
+- **`/admin`** is a private page for the owner (sign in with `ADMIN_KEY`). It shows live health of the app and every outside service it depends on, which AI providers are answering (and how fast), usage counts (no personal data), page errors reported by visitors, a log of what the autopilot noticed and did, the setup checklist, and — once accounts are on — the list of accounts with a delete button. Buttons: run the checks now, look up the current AI model names, clear AI cool-downs, send a test alert.
+- **The autopilot** (`.github/workflows/watchdog.yml` → `POST /api/cron/watchdog`, every ~10 minutes) *checks* the app, the shared store, the AI, the hadith/prayer/audio/map services and accounts; *notices* a problem only after two bad looks in a row; *fixes* what it can (finds the AI model names that exist today when a provider retires one, tidies expired reminder devices); and *alerts* you once per problem and once on recovery — as a phone notification (press “Get alerts on this device” in the control room), an optional chat webhook (`ALERT_WEBHOOK_URL`), and, if something important stays down, by failing the GitHub job, which makes GitHub email you.
+- The AI chain also **adapts by itself**: a provider that keeps failing or is very slow is moved behind the ones that work, and a slow one is backed up by the next after 3.5 seconds.
+- **Accounts**: `node scripts/setup-supabase.mjs https://your-site` (with `SUPABASE_ACCESS_TOKEN` and `VERCEL_TOKEN`) creates the free Supabase project, loads the schema, sets sign-in options and saves the keys to Vercel.

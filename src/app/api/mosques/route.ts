@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { track } from '@/lib/ops'
 import { distanceKm } from '@/lib/geo'
 import { clientIp, rateLimit } from '@/lib/ratelimit'
 import { redis, redisConfigured } from '@/lib/redis'
@@ -151,6 +152,7 @@ function tidy(list: Mosque[], radius: number): Mosque[] {
 export const maxDuration = 30
 
 export async function GET(request: NextRequest) {
+  track('mosques')
   const sp = request.nextUrl.searchParams
   if (!sp.has('lat') || !sp.has('lng')) {
     return NextResponse.json({ error: 'Valid lat and lng are required' }, { status: 400 })

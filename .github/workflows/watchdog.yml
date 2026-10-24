@@ -1,0 +1,33 @@
+name: Watchdog
+
+# The autopilot. Every ~10 minutes it asks the app to check itself and the free services it relies on, to fix what it can
+# (for example, find the AI model names that exist today), and to alert you on your phone / chat webhook. If something
+# important stays down, THIS JOB FAILS — and GitHub then emails you automatically, as a second, independent alarm.
+#
+# Uses the same two repository secrets as the prayer reminders: APP_URL and CRON_SECRET.
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Run the checks
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$APP_URL" ] || [ -z "$CRON_SECRET" ]; then echo "APP_URL / CRON_SECRET secrets are not set — nothing to do."; exit 0; fi
+          APP_URL=$(printf %s "$APP_URL" | tr -d '[:space:]'); APP_URL="${APP_URL%/}"
+          CRON_SECRET=$(printf %s "$CRON_SECRET" | tr -d '[:space:]')
+          case "$APP_URL" in https://*) ;; *) echo "::error::APP_URL must start with https:// (it is: $APP_URL)"; exit 1;; esac
+          code=$(curl --silent --show-error --max-time 100 -o report.json -w '%{http_code}' -X POST -H "Authorization: Bearer $CRON_SECRET" "$APP_URL/api/cron/watchdog" || echo 000)
+          echo "HTTP $code"
+          head -c 4000 report.json 2>/dev/null; echo
+          if [ "$code" = "401" ]; then echo "::error::The app refused the secret (401). CRON_SECRET in GitHub must be exactly the CRON_SECRET set in Vercel."; exit 1; fi
+          if [ "$code" = "000" ] || [ "$code" -ge 500 ] 2>/dev/null; then echo "::error::The app did not answer the watchdog (HTTP $code)"; exit 1; fi
+          if grep -q '"ok":false' report.json; then echo "::error::An important part of the app is down — see the report above"; exit 1; fi

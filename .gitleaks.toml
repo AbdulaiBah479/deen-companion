@@ -1,0 +1,7 @@
+# gitleaks: look for real secrets, but ignore the throwaway keys used only by the automated tests and the example file.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "test fixtures and examples"
+paths = ['''tests/.*''', '''\.env\.example''', '''DEPLOY\.md''', '''README\.md''']

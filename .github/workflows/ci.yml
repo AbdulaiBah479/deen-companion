@@ -28,6 +28,9 @@ jobs:
 
       - name: Lint
         run: npm run lint
+      # Next.js writes some of its types (LayoutProps, route types) itself; a fresh checkout does not have them yet.
+      - name: Generate Next.js types
+        run: npx next typegen
       - name: Type-check
         run: npx tsc --noEmit
       - name: Unit tests

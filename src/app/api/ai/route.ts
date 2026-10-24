@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { askAI, prepareAI, sanitizeHistory } from '@/lib/ai'
 import { dataAvailable, getVerses } from '@/lib/data'
+import { track } from '@/lib/ops'
 import { clientIp, rateLimit } from '@/lib/ratelimit'
 
 function passageContext(ref: unknown, lang: string): string | undefined {
@@ -66,6 +67,7 @@ export async function POST(request: NextRequest) {
       context: passageContext(passage, language),
       kids: kids === true,
     })
+    track('ai.' + result.mode)
     return NextResponse.json({ response: result.answer, sources: result.sources, provider: result.provider, mode: result.mode })
   } catch (error) {
     console.error('AI API Error:', error)

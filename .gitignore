@@ -52,3 +52,11 @@ next-env.d.ts
 
 .vercel
 .env*
+
+# temporary files the browser-test runner writes
+tests/_chunk-*.mjs
+.srv*.log
+.srv*.err
+.unit.log
+.fullx.log
+.full*.log

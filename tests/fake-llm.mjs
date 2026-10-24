@@ -12,7 +12,7 @@ import http from 'node:http'
 const port = Number(process.argv[2] || 4010)
 let calls = 0
 const hooks = []
-const redis = { map: new Map(), kv: new Map(), sets: new Map(), commands: 0, down: false }
+const redis = { map: new Map(), kv: new Map(), sets: new Map(), hashes: new Map(), lists: new Map(), commands: 0, down: false }
 const pushes = []
 const wiki = { summary: 0, article: 0, search: 0, lastSearch: '' }
 let pexelsSearches = 0
@@ -196,9 +196,21 @@ http
             return { result: e && (!e.exp || e.exp > now) ? e.v : null }
           }
           if (cmd === 'DEL') return { result: redis.kv.delete(key) ? 1 : 0 }
-          if (cmd === 'SADD') { const set = redis.sets.get(key) ?? new Set(); set.add(String(ms)); redis.sets.set(key, set); return { result: 1 } }
-          if (cmd === 'SREM') { redis.sets.get(key)?.delete(String(ms)); return { result: 1 } }
+          if (cmd === 'SADD') { const set = redis.sets.get(key) ?? new Set(); for (const m of args) set.add(String(m)); redis.sets.set(key, set); return { result: 1 } }
+          if (cmd === 'SREM') { for (const m of args) redis.sets.get(key)?.delete(String(m)); return { result: 1 } }
           if (cmd === 'SMEMBERS') return { result: [...(redis.sets.get(key) ?? [])] }
+          // hashes, lists and a few more, as used by the admin/autopilot bookkeeping
+          if (cmd === 'PING') return { result: 'PONG' }
+          if (cmd === 'EXPIRE') return { result: 1 }
+          if (cmd === 'EXISTS') return { result: redis.kv.has(key) ? 1 : 0 }
+          if (cmd === 'SCARD') return { result: (redis.sets.get(key) ?? new Set()).size }
+          if (cmd === 'HINCRBY') { const h = redis.hashes.get(key) ?? new Map(); h.set(String(args[0]), String(Number(h.get(String(args[0])) ?? 0) + Number(args[1]))); redis.hashes.set(key, h); return { result: Number(h.get(String(args[0]))) } }
+          if (cmd === 'HSET') { const h = redis.hashes.get(key) ?? new Map(); for (let i = 0; i + 1 < args.length; i += 2) h.set(String(args[i]), String(args[i + 1])); redis.hashes.set(key, h); return { result: 1 } }
+          if (cmd === 'HGET') return { result: redis.hashes.get(key)?.get(String(args[0])) ?? null }
+          if (cmd === 'HGETALL') return { result: [...(redis.hashes.get(key) ?? new Map())].flat() }
+          if (cmd === 'LPUSH') { const l = redis.lists.get(key) ?? []; l.unshift(String(args[0])); redis.lists.set(key, l); return { result: l.length } }
+          if (cmd === 'LTRIM') { const l = redis.lists.get(key) ?? []; redis.lists.set(key, l.slice(Number(args[0]), Number(args[1]) + 1)); return { result: 'OK' } }
+          if (cmd === 'LRANGE') return { result: (redis.lists.get(key) ?? []).slice(Number(args[0]), Number(args[1]) + 1) }
           return { error: 'ERR unknown command' }
         })
         json(200, out)

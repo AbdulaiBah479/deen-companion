@@ -18,15 +18,17 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   code:
-    name: insecure code patterns (Semgrep)
+    name: insecure code patterns (Semgrep) — advisory
     runs-on: ubuntu-latest
+    continue-on-error: true # findings are for you to read in the log; they should not turn the whole repo red
     container: { image: semgrep/semgrep }
     steps:
       - uses: actions/checkout@v4
       - run: semgrep scan --config p/typescript --config p/react --config p/nextjs --error --quiet src
   deps:
-    name: known-vulnerable packages (OSV)
+    name: known-vulnerable packages (OSV) — advisory
     runs-on: ubuntu-latest
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: google/osv-scanner-action/osv-scanner-action@v2

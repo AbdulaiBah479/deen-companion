@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { track } from '@/lib/ops'
 import { dataAvailable, isLang, searchHadithText, searchQuranText } from '@/lib/data'
 import { clientIp, rateLimit } from '@/lib/ratelimit'
 
 // Full-text search over the bundled Quran (English meaning search, shown in the chosen language) and hadith.
 export async function GET(request: NextRequest) {
+  track('search')
   const sp = request.nextUrl.searchParams
   const q = (sp.get('q') || '').trim()
   const lang = sp.get('lang') || 'en'

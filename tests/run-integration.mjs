@@ -50,6 +50,8 @@ start(process.execPath, ['node_modules/next/dist/bin/next', 'start', '-p', Strin
   VAPID_PRIVATE_KEY: 'lfeaVODTqLBiGuz-5_4sWYPyZselu-5n0fa2fSAc7Zk',
   VAPID_SUBJECT: 'mailto:test@example.com',
   CRON_SECRET: 'test-cron-secret-0123456789',
+  ADMIN_KEY: 'test-admin-key-0123456789-abcdefghij',
+  WATCHDOG_SKIP_EXTERNAL: '1',
   PUSH_ALLOW_HOSTS: 'localhost:4010',
   PUSH_ALLOW_TEST_NOW: '1',
   UPSTASH_REDIS_REST_URL: 'http://localhost:4010',

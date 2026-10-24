@@ -32,10 +32,14 @@ export async function detectWebGPU(): Promise<GpuSupport> {
 
 export const modelIdFor = (tier: LocalTier, f16: boolean) => (f16 ? LOCAL_MODELS[tier].f16 : LOCAL_MODELS[tier].f32)
 
+// Is the model already saved on this device? Looks straight into the browser's cache instead of loading the AI library
+// (about 1.8 MB) just to ask — so opening Settings or the AI page costs nothing unless you actually use on-device AI.
 export async function isModelCached(tier: LocalTier, f16: boolean): Promise<boolean> {
   try {
-    const { hasModelInCache } = await import('@mlc-ai/web-llm')
-    return await hasModelInCache(modelIdFor(tier, f16))
+    if (typeof caches === 'undefined' || !(await caches.has('webllm/model'))) return false
+    const id = modelIdFor(tier, f16)
+    const keys = await (await caches.open('webllm/model')).keys()
+    return keys.some((k) => k.url.includes('/' + id + '/') && k.url.endsWith('tensor-cache.json'))
   } catch {
     return false
   }

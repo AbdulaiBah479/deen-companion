@@ -49,6 +49,25 @@ export default function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
   }
 
   const isSignup = mode === 'signup'
+  const accountsOn = !!process.env.NEXT_PUBLIC_SUPABASE_URL && !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+  // Accounts need a database to be connected first. Until then nobody should hit a dead form.
+  if (!accountsOn) {
+    return (
+      <main className="flex-1 flex items-center justify-center px-4 py-10">
+        <div className="w-full max-w-sm bg-white border border-gray-200 rounded-2xl p-6 space-y-4 text-center">
+          <Link href="/" className="block font-black text-xl">
+            ☪ <span className="text-[#0F766E]">Deen</span> <span className="text-gold">Companion</span>
+          </Link>
+          <h1 className="text-xl font-bold">Accounts are not switched on yet</h1>
+          <p className="text-sm text-gray-600">You don’t need one. Everything works now, and your progress is saved safely on this phone. When accounts open you will be able to keep it in sync across devices.</p>
+          <Link href="/dashboard" className="block w-full py-3 rounded-xl bg-[#0F766E] text-white font-semibold">
+            Open the app
+          </Link>
+        </div>
+      </main>
+    )
+  }
 
   return (
     <main className="flex-1 flex items-center justify-center px-4 py-10">

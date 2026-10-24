@@ -1051,6 +1051,22 @@ await click('button[aria-haspopup=menu]'); await sleep(200); await clickText('Tu
 t('sleep timer: "Turn off timer" cancels it (still playing well past the 5 s)', await ev('!!document.querySelector("[role=region][aria-label=\\"Audio player\\"]")') && (await ev('document.querySelector("button[aria-haspopup=menu]")?.getAttribute("aria-label")')) === 'Sleep timer')
 await ev('delete window.__DEEN_AUDIO_BASE; delete window.__DEEN_SLEEP_MS')
 
+// ============================ v6: control room (admin) ============================
+await goto('/admin'); await waitFor('!!document.querySelector("input[aria-label=\\"Admin key\\"]")', 15000)
+t('admin: visitors only see a key box (no data)', (await ev('!!document.querySelector("input[aria-label=\\"Admin key\\"]")')) && !/Health/.test(await text()))
+t('admin: the page asks search engines to stay away', (await ev('document.querySelector("meta[name=robots]")?.content||""')).includes('noindex'))
+await setInput('input[aria-label="Admin key"]', 'a-wrong-key-a-wrong-key-a-wrong-key'); await clickText('Open'); await waitFor('/not right/.test(document.body.innerText)', 10000)
+t('admin: a wrong key is refused with a clear message', /That key is not right/.test(await text()))
+await setInput('input[aria-label="Admin key"]', 'test-admin-key-0123456789-abcdefghij'); await clickText('Open'); await waitFor('/Run checks now/.test(document.body.innerText)', 15000)
+t('admin: the right key opens the control room', /Control room/.test(await text()) && /Run checks now/.test(await text()))
+await clickText('Run checks now'); await waitFor('/Checks finished/.test(document.body.innerText)', 40000)
+t('admin: "Run checks now" runs the autopilot and reports', /Checks finished: everything important is fine/.test(await text()), (await text()).slice(0, 200).replace(/\n/g, ' '))
+await waitFor('/App and its data/.test(document.body.innerText)', 10000)
+t('admin: health cards, AI table, usage, errors, activity and setup checklist are all there', (await ev('["Health","AI providers","Usage","Page errors today","What the autopilot noticed","Setup checklist","Alerts to you","Accounts"].every(h=>document.body.innerText.includes(h))')))
+t('admin: it explains accounts are not switched on (no Supabase here)', /Accounts are not switched on yet/.test(await text()))
+await clickText('Sign out'); await waitFor('!!document.querySelector("input[aria-label=\\"Admin key\\"]")', 10000)
+t('admin: signing out closes it again', !(await ev('document.cookie.includes("deen_admin")')) && (await ev('!!document.querySelector("input[aria-label=\\"Admin key\\"]")')))
+
 // ============================ v4: navigation reaches everything ============================
 await goto('/more'); await waitFor('/Recite/.test(document.body.innerText)', 10000)
 const moreText = await text()
@@ -1059,8 +1075,8 @@ await goto('/dashboard'); await waitFor('/Khatam planner/.test(document.body.inn
 t('home: tiles for Recite, Khatam planner and Calendar', /Recite/.test(await text()) && /Khatam planner/.test(await text()) && /Calendar/.test(await text()))
 
 // ---------- Auth forms ----------
-await goto('/login'); await setInput('#email', 'a@b.co'); await setInput('#password', 'password123'); await ev('document.querySelector("form button").click()'); await sleep(500)
-t('login: without Supabase keys shows friendly message', /not configured/i.test(await text()))
+await goto('/login'); await sleep(500)
+t('login: without Supabase keys the page says accounts are not switched on and offers the app', /not switched on/i.test(await text()) && (await ev('!!document.querySelector("a[href=\\"/dashboard\\"]")')) && !(await ev('!!document.querySelector("form")')))
 
 // ---------- PWA / nav ----------
 await goto('/dashboard')

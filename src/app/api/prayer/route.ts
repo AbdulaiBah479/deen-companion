@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { track } from '@/lib/ops'
 import { getPrayerTimes, getPrayerTimesByCoords } from '@/lib/prayer'
 
 // GET /api/prayer?city=London&country=UK&method=2   or   /api/prayer?lat=51.5&lng=-0.12&method=2
 export async function GET(request: NextRequest) {
+  track('prayer')
   const sp = request.nextUrl.searchParams
   const method = Number(sp.get('method') || 2)
   if (!Number.isInteger(method) || method < 0 || method > 23) {

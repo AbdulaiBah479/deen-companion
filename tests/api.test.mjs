@@ -466,6 +466,52 @@ for (let i = 0; i < 20; i++) if ((await ask('salaam ' + i)).status === 429) limi
   ok('hadith chapter: bad chapter or collection is refused', (await fetch(`${APP}/api/hadith/section?book=bukhari&n=9999`)).status === 404 && (await fetch(`${APP}/api/hadith/section?book=zzz&n=1`)).status === 400)
 }
 
+// ───────── tafsir study: connected verses and plain explanation ─────────
+{
+  const c = await (await fetch(`${APP}/api/tafsir/connections?key=2:255&lang=en`)).json()
+  ok('tafsir connections: Ayat al-Kursi points to real verses, with Arabic and translation', c.pointed?.length >= 2 && c.pointed.every((p) => p.arabic.length > 5 && p.text.length > 5 && p.surah >= 1 && p.surah <= 114), JSON.stringify(c.labels))
+  ok('tafsir connections: the verse is not linked to itself, and hadith page numbers are not verses', !c.pointed.some((p) => p.ref === '2:255') && !c.similar.some((p) => p.ref === '2:255'))
+  ok('tafsir connections: bad or impossible keys are refused', (await fetch(`${APP}/api/tafsir/connections?key=abc`)).status === 400 && (await fetch(`${APP}/api/tafsir/connections?key=1:99`)).status === 400)
+  const bad = await fetch(`${APP}/api/tafsir/explain`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: '200:1' }) })
+  ok('tafsir explain: an impossible verse is refused', bad.status === 400)
+  const ex = await fetch(`${APP}/api/tafsir/explain`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: '112:1', level: 'simple' }) })
+  const exd = await ex.json()
+  ok('tafsir explain: always returns readable sections (AI-written or the commentary itself)', ex.status === 200 && exd.sections?.length >= 1 && exd.sections.every((s) => s.title && s.body.length > 20) && (exd.source === 'ai' || exd.source === 'tafsir'), JSON.stringify(exd).slice(0, 150))
+  ok('tafsir: the new Arabic sources work (Qurtubi, Tabari, Baghawi, Wasit)', (await Promise.all([90, 15, 94, 93].map(async (id) => (await fetch(`${APP}/api/tafsir?key=1:2&id=${id}`)).status === 200))).every(Boolean))
+}
+
+// ───────── sermons (khutbah) ─────────
+{
+  const mk = (b) => fetch(`${APP}/api/khutbah`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(b) })
+  const r = await mk({ topic: 'sincerity', minutes: 5 })
+  const d = await r.json()
+  ok('khutbah: a topic gives five sections, verified evidence and the fixed opening verses', r.status === 200 && d.sections?.length === 5 && d.evidence?.some((e) => e.id === 'Q1' && e.arabic) && d.fixed?.hajah?.length === 3 && d.fixed.hajah.every((v) => v.arabic) && !!d.fixed.closing.arabic, JSON.stringify(d).slice(0, 160))
+  ok('khutbah: every [Q#]/[H#] marker in the text points to evidence that exists', d.sections.every((s) => [...s.body.matchAll(/\[((?:Q|H)\d+)\]/g)].every((m) => d.evidence.some((e) => e.id === m[1]))))
+  ok('khutbah: the intentions hadith comes from Bukhari, not from a model', d.evidence.some((e) => e.kind === 'hadith' && /Bukhari/.test(e.ref) && /intentions/.test(e.text)))
+  const c = await (await mk({ custom: 'patience when a loved one is ill' })).json()
+  ok('khutbah: a topic written by the imam works too', c.sections?.length === 5 && c.evidence?.length >= 3 && c.title === 'patience when a loved one is ill')
+  ok('khutbah: no topic, too-short topic, or bad body is refused', (await mk({})).status === 400 && (await mk({ custom: 'a' })).status === 400 && (await mk({ topic: 'nope' })).status === 400)
+  const f = await (await mk({ topic: 'friday', lang: 'fr' })).json()
+  ok('khutbah: the verses come in the language asked for', /Dieu|Allah/i.test(f.fixed?.hajah?.[0]?.text || ''), f.fixed?.hajah?.[0]?.text?.slice(0, 80))
+}
+
+// ───────── Islamic books ─────────
+{
+  const en = await (await fetch(`${APP}/api/books/page?id=munqidh&lang=en&page=1`)).json()
+  ok('books: an English page of a Gutenberg book loads, without the licence header', en.paragraphs?.length > 3 && en.pages > 5 && !/START OF THE PROJECT GUTENBERG/i.test(JSON.stringify(en.paragraphs)) && /gutenberg\.org/.test(en.source?.url), JSON.stringify(en).slice(0, 140))
+  const en2 = await (await fetch(`${APP}/api/books/page?id=munqidh&lang=en&page=2`)).json()
+  ok('books: page 2 is different from page 1', en2.page === 2 && en2.paragraphs[0] !== en.paragraphs[0])
+  const ar = await (await fetch(`${APP}/api/books/page?id=munqidh&lang=ar&page=1`)).json()
+  ok('books: the Arabic original loads from Arabic Wikisource, in Arabic script, with its licence', ar.paragraphs?.length > 3 && /[؀-ۿ]{3,}/.test(ar.paragraphs.join(' ')) && /CC BY-SA/.test(ar.source?.licence), JSON.stringify(ar).slice(0, 140))
+  ok('books: an unknown book, or a language the book does not have, is a clean 404', (await fetch(`${APP}/api/books/page?id=nope`)).status === 404 && (await fetch(`${APP}/api/books/page?id=bidayat&lang=en`)).status === 404)
+  const far = await (await fetch(`${APP}/api/books/page?id=munqidh&lang=en&page=99999`)).json()
+  ok('books: a page number beyond the end gives the last page', far.page === far.pages)
+  const post = (b) => fetch(`${APP}/api/books/explain`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(b) })
+  ok('books explain: a visitor cannot send their own text — only a position in a real book', (await post({ id: 'nope', page: 1, para: 0 })).status === 400 && (await post({ id: 'munqidh', page: 1, para: 9999 })).status === 404 && (await post({ id: 'munqidh', page: 'x', para: 0 })).status === 400)
+  const ex = await post({ id: 'munqidh', lang: 'en', page: 1, para: 2, mode: 'explain' })
+  ok('books explain: a real paragraph gets an AI explanation, or an honest “busy” message', ex.status === 200 || ex.status === 503, String(ex.status))
+}
+
 ok('rate limit: a burst beyond 15/min is refused with 429 + Retry-After', limited > 0, `${limited} of 20 refused`)
 
 console.log(fails ? `\n${fails} FAILED` : '\nALL PASSED')

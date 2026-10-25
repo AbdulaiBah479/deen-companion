@@ -22,10 +22,16 @@ npm run dev         # http://localhost:3000
 ## Features
 
 **Read & listen** — Surah list, Juz list, 604-page Mushaf view (swipe / ← → keys), Translation or continuous Reading mode, adjustable
-Arabic/translation size, Amiri Quran typeface, tajweed colours, word-by-word meaning, 8 tafsirs (English, Arabic, Urdu), bookmarks,
+Arabic/translation size, Amiri Quran typeface, tajweed colours, word-by-word meaning, 12 tafsirs (English, Arabic, Urdu), bookmarks,
 “continue reading”, deep links (`/quran/2#v255`). A global audio mini-player keeps playing while you navigate: continuous play into
 the next surah, repeat verse, speed 0.75–1.5×, **25 reciters**, lock-screen controls. Verse sheet: play, save, copy, share,
 **share as image**, tafsir, ask AI, make a reel, recite.
+
+**Tafsir study** (`/tafsir`) — pick any verse of the Quran and get: the verse with recitation; a plain-language explanation (simple / standard / deeper) written by AI *only from the verse and the commentaries* and clearly labelled; twelve classical and modern commentaries (Ibn Kathir, Ma‘arif al-Qur’an, Tazkirul Quran, Al-Muyassar, As-Sa‘di, Al-Wasit, Al-Baghawi, Al-Qurtubi, At-Tabari and Urdu sources); **connected verses** (the verses the scholar himself cites, read from Ibn Kathir and checked against the real length of each surah so a hadith page number is never mistaken for a verse, plus verses close in meaning); and a **Listen** button that reads the explanation or the commentary aloud (device voices, Arabic with an Arabic voice, pause/resume/speed).
+
+**Sermons** (`/khutbah`) — 31 topics (everyday and occasions: Ramadan, Eid, Dhul Hijjah, Hijri new year, Ashura, Isra’ wal-Mi‘raj, rain prayer…) or a topic the imam writes. The opening praise, the verses and the hadith are copied from the app’s own Quran and Sahih al-Bukhari/Muslim data (a test checks every one); the AI only writes the explanation around them and may only point at the evidence it was given. Without an AI the app returns a sourced outline. Listen, read large from a screen, copy, download, print, save on the device. Labelled a draft the imam must review.
+
+**Islamic books** (`/books`) — non-hadith classics. Inside the app only where the text is free to share: English translations from Project Gutenberg (public domain) and Arabic originals from Arabic Wikisource (CC BY-SA, credited): al-Ghazali, Ibn Tufayl, al-Hujwiri, Sa‘di, Rumi, at-Tahawi, Ibn Qudama. Pages, remembered place, **Listen**, and per-paragraph “Translate (AI)” / “Explain (AI)” (the server reads the paragraph itself, so it cannot be used as a free general chatbot). A further reading list of 18 great works links to search pages only; nothing is claimed about where a copy lives.
 
 **Recite (Tarteel-style)** (`/recite`) — recite aloud and the app follows along word by word: correct words turn green, skipped
 words amber, misread words red (with what it heard), and a memorisation mode hides words until you recite them. Uses the browser’s
@@ -158,6 +164,8 @@ Strict response headers on every page (Content-Security-Policy limiting scripts,
 
 ## Known limits
 
+- AI explanations, sermon drafts and book translations can contain mistakes; each is labelled, and the sermon draft must be reviewed by the imam. A scholar should review the topic points in the sermon library.
+- Books inside the app are limited to texts that are free to share; Wikisource Arabic text depends on volunteers’ typing and its pages may change.
 - Menus are English; Quran translations, hadith and AI answers follow the chosen language.
 - Prayer reminders fire only while the app is open (true background push needs a push server).
 - Speech features use the browser’s recognition (Chrome/Edge). Matching is approximate; confirm in the mushaf.
@@ -169,7 +177,7 @@ Strict response headers on every page (Content-Security-Policy limiting scripts,
 
 ## Sources & licences
 
-Quran text/translations/tafsir/tajweed/word-by-word: Quran.Foundation API · Audio: EveryAyah, Quran.com CDN · Prayer times & Names: AlAdhan ·
+Quran text/translations/tafsir/tajweed/word-by-word: Quran.Foundation API · Books: Project Gutenberg (public domain), Arabic Wikisource (CC BY-SA 4.0) · Audio: EveryAyah, Quran.com CDN · Prayer times & Names: AlAdhan ·
 Hadith: fawazahmed0/hadith-api · Duas: fitrahive/dua-dhikr · Maps: © OpenStreetMap contributors (ODbL) · Prices: gold-api.com,
 ExchangeRate-API · Spaced repetition: ts-fsrs · Typeface: Amiri Quran (SIL OFL) · On-device AI: @mlc-ai/web-llm (Apache-2.0).
 Translations keep their translators’ copyright, which is why `./data` is generated locally rather than committed.

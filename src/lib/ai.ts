@@ -419,6 +419,19 @@ async function askAIInner(opts: AskOptions): Promise<AIResult> {
   return { answer: extractiveAnswer(sources, 'unavailable'), sources, provider: null, mode: 'sources' }
 }
 
+// A one-off job for a model (a verse study, a sermon draft): the caller writes the whole prompt and checks the result itself.
+// Null when no model is set up, the daily allowance is used, or every model is busy.
+export async function runModel(system: string, user: string): Promise<{ text: string; provider: string } | null> {
+  const providers = configuredProviders()
+  if (!providers.length || !dailyBudgetLeft()) return null
+  await refreshDiscovered()
+  chain.setProviders(providers)
+  const r = await chain.run(system, [{ role: 'user', content: user.slice(0, 12_000) }])
+  if (!r) return null
+  spendOne()
+  return { text: r.answer, provider: r.provider }
+}
+
 // For the admin view and the watchdog.
 export function aiPerformance() {
   return chain.performance()

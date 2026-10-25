@@ -37,6 +37,9 @@ const LABELS: Record<string, string> = {
 const DOT: Record<Status, string> = { up: 'bg-green-500', degraded: 'bg-amber-500', down: 'bg-red-500' }
 const COUNT_ROWS: [string, string][] = [
   ['ai.ask', 'AI questions asked'],
+  ['tafsir.explain', 'Verse explanations written'],
+  ['khutbah.make', 'Sermon drafts prepared'],
+  ['books.ai', 'Book paragraphs translated or explained'],
   ['ai.llm', '…answered by an AI model'],
   ['ai.cache', '…answered from saved answers'],
   ['ai.sources', '…answered from sources only'],

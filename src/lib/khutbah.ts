@@ -87,6 +87,21 @@ export const TOPICS: Topic[] = [
     points: ['Drought is a reminder to turn back to Allah.', 'Nuh’s advice: seek forgiveness, and He sends rain, wealth and children.', 'Gratitude for water, not wasting it, and helping those who are affected.'] },
 ]
 
+// The topic that fits a Hijri date best (an occasion that is near, otherwise an everyday topic that changes each week).
+export function suggestTopic(h: { day: number; month: number }, weekNumber = 0): string {
+  const { day, month } = h
+  if (month === 1 && day <= 3) return 'hijri'
+  if (month === 1 && day >= 4 && day <= 10) return 'ashura'
+  if (month === 7 && day >= 20 && day <= 28) return 'isra'
+  if ((month === 8 && day >= 18) || (month === 9 && day <= 5)) return 'ramadan-coming'
+  if (month === 9 && day >= 20) return 'last-ten'
+  if (month === 10 && day <= 3) return 'eid-fitr'
+  if (month === 12 && day <= 9) return 'dhul-hijjah'
+  if (month === 12 && day >= 10 && day <= 13) return 'eid-adha'
+  const everyday = TOPICS.filter((t) => t.kind === 'evergreen')
+  return everyday[Math.abs(weekNumber) % everyday.length].id
+}
+
 export const topicById = (id: string): Topic | undefined => TOPICS.find((t) => t.id === id)
 
 // Parses "3:102" or "2:155-157".

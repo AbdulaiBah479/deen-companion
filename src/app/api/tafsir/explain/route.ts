@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
     const paras = ((ik ?? ma)?.paragraphs ?? []).filter((p) => p.length > 80).slice(0, 3)
     return paras.length ? [{ title: 'From the commentary', body: paras.join('\n\n') }] : []
   }
-  if (!verse || !material.length) return NextResponse.json({ sections: fallback(), source: 'tafsir', provider: null })
+  if (!verse || !material.length) return NextResponse.json({ sections: fallback(), source: 'tafsir' })
 
   const limit = await rateLimit(`tafsir-ex:${clientIp(request.headers)}`, 10, 60_000)
   if (!limit.ok) return NextResponse.json({ error: 'Please wait a moment and try again.' }, { status: 429, headers: { 'Retry-After': String(limit.retryAfter) } })
@@ -83,9 +83,9 @@ export async function POST(request: NextRequest) {
   const user = `Verse ${key} (Arabic): ${verse.text_uthmani}\nTranslation: ${verse.translations[0]?.text ?? verseEn?.translations[0]?.text ?? ''}\n\nCOMMENTARY:\n${material.join('\n\n')}`
   const r = await runModel(system, user)
   const sections = r ? parseSections(r.text) : null
-  if (!r || !sections) return NextResponse.json({ sections: fallback(), source: 'tafsir', provider: null })
+  if (!r || !sections) return NextResponse.json({ sections: fallback(), source: 'tafsir' })
 
-  const payload = { sections, source: 'ai', provider: r.provider }
+  const payload = { sections, source: 'ai' }
   if (redisConfigured()) redis([['SET', cacheKey, JSON.stringify(payload), 'EX', 30 * 86400]]).catch(() => {})
   return NextResponse.json(payload)
 }

@@ -13,7 +13,7 @@ import { redis, redisConfigured } from '@/lib/redis'
 
 // A draft Friday or occasion sermon.
 // POST /api/khutbah { topic?: "sincerity", custom?: "free text topic", minutes?: 5|10|15, lang?, audience? }
-//   -> { title, sections: [{heading, body}], evidence: [...], fixed: {...}, source: 'ai' | 'outline', provider }
+//   -> { title, sections: [{heading, body}], evidence: [...], fixed: {...}, source: 'ai' | 'outline' }  (which AI service wrote it is never shown to visitors)
 // The verses and hadith are copied from the app's own data. A model only writes the explanation around them, and may only
 // point at the evidence it was given ([Q1], [H1]). With no model available, an outline built from the topic is returned.
 
@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
     closing: { ref: CLOSING_VERSE, ...fixedVerse(CLOSING_VERSE) },
   }
   const respond = (sections: Section[], source: 'ai' | 'outline', provider: string | null, extra: Record<string, unknown> = {}) =>
-    NextResponse.json({ title, minutes: length.minutes, lang, sections, evidence, fixed, source, provider, ...extra })
+    NextResponse.json({ title, minutes: length.minutes, lang, sections, evidence, fixed, source, ...extra })
 
   const outline = () => outlineDraft(topic ?? { title, blurb: `A reminder about ${title}.`, points: [`Reflect on ${title} in the light of the Quran and Sunnah.`, 'What the Quran says about it.', 'What the Prophet ﷺ taught about it.'] }, evidence)
 

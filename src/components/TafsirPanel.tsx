@@ -53,6 +53,11 @@ export default function TafsirPanel({ verseKey }: { verseKey: string }) {
           </option>
         ))}
       </select>
+      {verseKey.includes(':') && (
+        <a href={`/tafsir/${verseKey.replace(':', '/')}`} className="inline-block text-xs font-semibold text-[#0F766E] underline">
+          Study this verse in depth: explanation, connected verses, listen →
+        </a>
+      )}
       {!result && <p className="text-gray-500">Loading tafsir…</p>}
       {result && 'error' in result && <p className="text-red-600">{result.error}</p>}
       {result && 'paragraphs' in result && (

@@ -1,6 +1,6 @@
 // Checks the sermon library against the app's real data: every verse and hadith a topic names must exist and say what the topic needs.
 // Run: npm run test:khutbah
-import { TOPICS, parseRef, topicById } from '../src/lib/khutbah.ts'
+import { TOPICS, parseRef, suggestTopic, topicById } from '../src/lib/khutbah.ts'
 import { HEADINGS, keepKnownMarkers, outlineDraft, parseDraft, sermonText, wordsFor } from '../src/lib/khutbah-text.ts'
 import { customEvidence, resolveHadith, resolveVerse, topicEvidence } from '../src/lib/khutbah-build.ts'
 
@@ -47,6 +47,11 @@ const out = outlineDraft(topicById('patience')!, topicEvidence(topicById('patien
 ok('outline: five sections, with a verse and a hadith inside the points', out.length === 5 && out[1].body.includes('Allah says') && /\[Q\d\]/.test(out[1].body) && out.some((s) => /\[H\d\]/.test(s.body)))
 ok('outline: still five sections with no evidence at all', outlineDraft(topicById('rain')!, []).length === 5)
 ok('text: the downloadable text lists each part under its label', sermonText('T', [{ label: 'Intro', text: 'abc' }, { label: 'Verse', arabic: 'ARABIC', text: 'def' }]) === 'T\n\nINTRO\nabc\n\nVERSE\nARABIC\ndef\n')
+
+// ───────── the suggested topic follows the Hijri calendar ─────────
+ok('suggest: near Eid al-Adha, Dhul Hijjah and Ramadan the matching occasion is offered', suggestTopic({ day: 5, month: 12 }) === 'dhul-hijjah' && suggestTopic({ day: 10, month: 12 }) === 'eid-adha' && suggestTopic({ day: 22, month: 9 }) === 'last-ten' && suggestTopic({ day: 1, month: 10 }) === 'eid-fitr' && suggestTopic({ day: 25, month: 8 }) === 'ramadan-coming' && suggestTopic({ day: 1, month: 1 }) === 'hijri' && suggestTopic({ day: 10, month: 1 }) === 'ashura')
+ok('suggest: any other time an everyday topic is offered, a different one each week, and it always exists', (() => { const ids = new Set<string>(); for (let w = 0; w < 60; w++) { const id = suggestTopic({ day: 15, month: 4 }, w); if (!topicById(id) || topicById(id)!.kind !== 'evergreen') return false; ids.add(id) } return ids.size >= 20 })())
+ok('suggest: a negative or huge week number cannot break it', !!topicById(suggestTopic({ day: 1, month: 4 }, -7)) && !!topicById(suggestTopic({ day: 1, month: 4 }, 99999999)))
 
 console.log(fails ? `\n${fails} FAILED` : '\nall passed')
 process.exit(fails ? 1 : 0)

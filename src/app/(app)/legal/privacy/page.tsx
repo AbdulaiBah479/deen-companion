@@ -58,6 +58,11 @@ export default function PrivacyPage() {
           address when your browser loads their files.
         </li>
         <li>
+          <strong>Tafsir study, sermons and books.</strong> When you ask for an explanation of a verse, a sermon draft or a translation of a paragraph, only the verse or
+          passage reference (and the topic you typed for a sermon) is sent to the AI service; the server reads the text itself. Sermons you save stay on your device.
+          Do not type personal details into a sermon topic.
+        </li>
+        <li>
           <strong>Your IP address.</strong> Our server uses it briefly to limit abuse (for example “no more than 15 AI questions a minute”). That counter expires
           within a minute. The hosting provider keeps ordinary server logs.
         </li>

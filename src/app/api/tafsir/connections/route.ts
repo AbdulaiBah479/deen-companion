@@ -3,11 +3,14 @@ import { dataAvailable, getSurahs, getVerses, searchQuranText } from '@/lib/data
 import { fetchTafsir } from '@/lib/tafsir-server'
 import { extractRefs, refLabel } from '@/lib/tafsir-refs'
 import { LANGUAGES } from '@/lib/language-list'
+import { clientIp, rateLimit } from '@/lib/ratelimit'
 
 // Verses connected to one verse: the ones the commentary itself points to (read from Ibn Kathir), and others close in meaning.
 // GET /api/tafsir/connections?key=2:255[&lang=en]
 export async function GET(request: NextRequest) {
   await connection()
+  const limit = await rateLimit(`tafsir-conn:${clientIp(request.headers)}`, 60, 60_000)
+  if (!limit.ok) return NextResponse.json({ error: 'Too many requests, please slow down.' }, { status: 429, headers: { 'Retry-After': String(limit.retryAfter) } })
   const sp = request.nextUrl.searchParams
   const key = sp.get('key') || ''
   const m = /^(\d{1,3}):(\d{1,3})$/.exec(key)

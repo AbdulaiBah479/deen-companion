@@ -11,7 +11,7 @@ import { TAFSIRS, defaultTafsirFor } from '@/lib/tafsirs'
 
 type Verse = { verse_key: string; text_uthmani: string; translations: { text: string }[] }
 type Section = { title: string; body: string }
-type Explain = { sections: Section[]; source: 'ai' | 'tafsir'; provider: string | null }
+type Explain = { sections: Section[]; source: 'ai' | 'tafsir' }
 type Linked = { ref: string; surah: number; from: number; arabic: string; text: string; truncated: boolean; mentions?: number }
 type Connections = { pointed: Linked[]; similar: Linked[] }
 type Level = 'simple' | 'standard' | 'deep'

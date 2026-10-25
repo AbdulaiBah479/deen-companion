@@ -1,9 +1,10 @@
 'use client'
 
 import Link from 'next/link'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { toHijri } from '@/lib/hijri'
 import { ReadAloudBar, useReadAloud, type Para } from '@/components/ReadAloud'
-import { AMMA_BA3D, AUDIENCES, CLOSING_AR, CLOSING_EN, HAJAH_AR, HAJAH_EN, LENGTHS, SECOND_OPENING_AR, SECOND_OPENING_EN, TOPICS } from '@/lib/khutbah'
+import { AMMA_BA3D, AUDIENCES, CLOSING_AR, CLOSING_EN, HAJAH_AR, HAJAH_EN, LENGTHS, SECOND_OPENING_AR, SECOND_OPENING_EN, TOPICS, suggestTopic, topicById } from '@/lib/khutbah'
 import { sermonText } from '@/lib/khutbah-text'
 import { useLang } from '@/lib/languages'
 import { useStored } from '@/lib/storage'
@@ -17,7 +18,6 @@ type Sermon = {
   evidence: Ev[]
   fixed: { hajah: Fixed[]; salawat: Fixed; closing: Fixed }
   source: 'ai' | 'outline'
-  provider: string | null
 }
 type Part = { label: string; arabic?: string; text: string; ev?: Ev[] }
 type Saved = { at: number; sermon: Sermon }
@@ -58,6 +58,13 @@ export default function KhutbahBuilder() {
   const [size, setSize] = useState(32)
   const [copied, setCopied] = useState(false)
 
+  // The topic that suits today's date (an occasion that is near, otherwise one that changes every week).
+  const [suggested, setSuggested] = useState<string | null>(null)
+  useEffect(() => {
+    const now = new Date()
+    setSuggested(suggestTopic(toHijri(now), Math.floor(now.getTime() / (7 * 86400_000))))
+  }, [])
+  const suggestedTopic = suggested ? topicById(suggested) : undefined
   const topics = TOPICS.filter((t) => t.kind === mode)
   const parts = useMemo(() => (sermon ? toParts(sermon) : []), [sermon])
   const paras = useMemo<Para[]>(() => parts.flatMap((p) => [...(p.arabic ? [{ text: p.arabic, lang: 'ar-SA' }] : []), ...(p.text ? [{ text: p.text }] : [])]), [parts])
@@ -139,6 +146,12 @@ export default function KhutbahBuilder() {
         <p className="text-xs text-amber-700 mt-1">The explanation is a draft written by AI. The imam must read it, check it, and make it his own before delivering it.</p>
       </header>
 
+      {suggestedTopic && (
+        <p className="text-sm rounded-xl bg-teal-50 border border-teal-200 p-3 print:hidden" data-testid="khutbah-suggestion">
+          Suggested for now: <strong>{suggestedTopic.title}</strong>{' '}
+          <button onClick={() => { setMode(suggestedTopic.kind); setTopicId(suggestedTopic.id) }} className="underline text-[#0F766E] font-semibold">Use this topic</button>
+        </p>
+      )}
       <section className="rounded-2xl border border-gray-200 bg-white p-4 space-y-3 print:hidden" aria-label="Choose a topic">
         <div className="flex flex-wrap gap-2" role="group" aria-label="Kind of sermon">
           {([['evergreen', 'Any Friday'], ['occasion', 'Occasions'], ['custom', 'Write my own topic']] as const).map(([id, label]) => (

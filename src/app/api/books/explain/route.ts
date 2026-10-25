@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
       : `You explain a passage from the book “${book.title}” by ${book.author}, in ${toName}, to an ordinary reader. First say in two or three sentences what the passage means in plain words. Then, if needed, explain any difficult word or reference. Use only what is in the passage; do not invent facts, quotes or rulings, and do not give fatwas. If the passage is unclear, say so. No markdown symbols.`
   const r = await runModel(system, text.slice(0, 3500))
   if (!r) return NextResponse.json({ error: 'The AI helper is busy right now. Please try again in a little while.' }, { status: 503 })
-  const payload = { text: r.text.trim(), provider: r.provider }
+  const payload = { text: r.text.trim() }
   if (redisConfigured()) redis([['SET', cacheKey, JSON.stringify(payload), 'EX', 30 * 86400]]).catch(() => {})
   return NextResponse.json(payload)
 }

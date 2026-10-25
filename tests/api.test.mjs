@@ -34,7 +34,7 @@ const a = await ask('What does the Quran say about patience in hardship?')
 ok('healthy: answered by the model', a.mode === 'llm' && a.provider === 'Custom' && /FAKE-LLM/.test(a.response), `${a.mode}/${a.provider}`)
 ok('healthy: real sources attached', a.sources.length > 0 && a.sources.some((s) => s.kind === 'quran'))
 const st0 = await status()
-ok('status: provider is configured and available', st0.configured === 1 && st0.providers[0].available === true && st0.providers[0].name === 'Custom')
+ok('status: provider is configured and available', st0.configured === 1 && st0.providers[0].available === true && st0.providers[0].name === undefined)
 ok('status never leaks secrets', !JSON.stringify(st0).match(/key|secret|token|http/i), JSON.stringify(st0))
 
 // 2. Caching: the same question again costs zero model calls
@@ -55,7 +55,7 @@ const q1 = await ask('FORCE429 what is zakat')
 ok('quota: when the only provider is rate-limited the user gets a sources-only answer, not an error', q1.status === 200 && q1.mode === 'sources' && q1.provider === null && q1.response.length > 40, q1.response.slice(0, 80))
 ok('quota: the sources-only answer says it is not an AI explanation', /without interpretation|busy/i.test(q1.response))
 const st1 = await status()
-ok('quota: status shows the provider resting with a countdown', st1.providers[0].available === false && st1.providers[0].retryInSeconds >= 1 && st1.providers[0].reason === 'rate-limit', JSON.stringify(st1.providers[0]))
+ok('quota: status shows the provider resting with a countdown', st1.providers[0].available === false && st1.providers[0].retryInSeconds >= 1 && st1.providers[0].reason === undefined, JSON.stringify(st1.providers[0]))
 const mid = await calls()
 const q2 = await ask('What is zakat and who must pay it?')
 ok('quota: while resting, requests do NOT hammer the provider', (await calls()) === mid && q2.mode === 'sources', `calls ${mid}->${await calls()}`)
@@ -69,7 +69,7 @@ ok('quota: only one real call was spent on the failure', (await calls()) - calls
 const o1 = await ask('FORCE500 tell me about hajj')
 ok('outage: 500 from the provider -> still a useful sources answer', o1.status === 200 && o1.mode === 'sources')
 const st2 = await status()
-ok('outage: provider rests briefly after a transient error', st2.providers[0].available === false && st2.providers[0].reason === 'transient')
+ok('outage: provider rests briefly after a transient error', st2.providers[0].available === false)
 
 // 5. Off-topic / no sources fallbacks are graceful
 await sleep(20500) // transient cool-down is 20s
@@ -174,7 +174,7 @@ ok('validation: oversize message -> 400', (await askPatient('a'.repeat(2500))).s
 {
   const h = await fetch(APP + '/api/health')
   const hj = await h.json()
-  ok('health: up, with data present, and no secrets in the reply', h.status === 200 && hj.ok === true && typeof hj.aiProviders === 'number' && hj.sharedRateLimit === true && !JSON.stringify(hj).match(/key|token|secret/i), JSON.stringify(hj))
+  ok('health: up, with data present, and no secrets in the reply', h.status === 200 && hj.ok === true && hj.aiProviders === undefined && hj.sharedRateLimit === undefined && !JSON.stringify(hj).match(/key|token|secret/i), JSON.stringify(hj))
   const post = (body, raw) => fetch(APP + '/api/client-error', { method: 'POST', body: raw ?? JSON.stringify(body) })
   const w0 = await (await fetch(LLM + '/webhook-stats')).json()
   const r1 = await post({ kind: 'error', message: 'Boom in test', source: 'https://x.test/_next/static/chunk.js?v=1#frag', page: '/quran/1?q=secret#x' })

@@ -1089,7 +1089,7 @@ await goto('/zakat'); await waitFor('/Where your zakat can go/.test(document.bod
 await waitFor('/Gaza: emergency relief/.test(document.body.innerText)', 15000)
 const zt = await text()
 t('zakat: shows where zakat can go — Gaza relief, orphans, food, water…', ['Gaza: emergency relief', 'Caring for orphans', 'Feeding the hungry', 'Clean water wells'].every((x) => zt.includes(x)))
-t('zakat: each cause opens the charity’s own site in a new tab, safely', await ev('(()=>{const a=[...document.querySelectorAll("#causes a")];return a.length>=8&&a.every(x=>x.target==="_blank"&&/noopener/.test(x.rel)&&x.href.startsWith("https://"))})()'))
+t('zakat: each cause opens the charity’s own site in a new tab, safely', await ev('(()=>{const all=[...document.querySelectorAll("#causes a")];const a=all.filter(x=>new URL(x.href).origin!==location.origin);return a.length>=8&&a.every(x=>x.target==="_blank"&&/noopener/.test(x.rel)&&x.href.startsWith("https://"))&&all.some(x=>x.getAttribute("href").startsWith("/report?cat=abuse"))})()'))
 t('zakat: it says clearly that the app never handles money', /never handles your money/.test(await text()))
 t('zakat: each cause says whether it counts as zakat', /Usually zakat-eligible/.test(await text()) && /Sadaqah \(not zakat\)/.test(await text()) && /Zakat-eligible in some forms/.test(await text()))
 await click('#causes input[type=checkbox]'); await sleep(300)

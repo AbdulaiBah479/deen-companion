@@ -31,14 +31,22 @@ export type Cause = {
   active: boolean
 }
 
-const isHttps = (u: string) => {
+// A charity link must be a normal https address on a real-looking domain name. Refused on purpose: passwords in the address,
+// raw IP numbers and internal names (used to hide where a link really goes), and look-alike "punycode" domains (xn--…).
+export const isSafeCharityLink = (u: string): boolean => {
   try {
     const x = new URL(u)
-    return x.protocol === 'https:' && !x.username && !x.password && x.hostname.includes('.')
+    const host = x.hostname.toLowerCase()
+    if (x.protocol !== 'https:' || x.username || x.password || x.port) return false
+    if (!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(host)) return false
+    if (/^[0-9.]+$/.test(host) || host.split('.').some((p) => p.startsWith('xn--'))) return false
+    if (!/[a-z]/.test(host.split('.').pop() ?? '')) return false
+    return !/\.(localhost|local|internal|lan|test|example|invalid)$/.test(host) // names that only exist inside a private network
   } catch {
     return false
   }
 }
+const isHttps = isSafeCharityLink
 const CONTROL = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g
 const clean = (v: unknown, max: number) => (typeof v === 'string' ? v.replace(CONTROL, '').trim().slice(0, max) : '')
 

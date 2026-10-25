@@ -28,7 +28,7 @@ const TILES = [
   { href: '/reels', icon: '▶️', title: 'Reels', desc: 'Swipe verses & reminders' },
   { href: '/learn', icon: '🎓', title: 'Learn', desc: 'Letters, words, tajweed' },
   { href: '/companion', icon: '🤖', title: 'AI Companion', desc: 'Ask with sources' },
-  { href: '/identify', icon: '🎙', title: 'Identify a verse', desc: 'Like Shazam' },
+  { href: '/identify', icon: '🎙', title: 'Identify a verse', desc: 'Listen and find the verse' },
   { href: '/recite', icon: '🎤', title: 'Recite', desc: 'Get live feedback' },
   { href: '/goals', icon: '📅', title: 'Khatam planner', desc: 'Finish the Quran' },
   { href: '/prayer', icon: '🕌', title: 'Prayer times', desc: 'Tracker & reminders' },

@@ -140,3 +140,18 @@ export async function signOut() {
   const { createClient } = await import('./supabase')
   await createClient().auth.signOut()
 }
+
+// Deletes the signed-in person's own account and the progress saved online. Data on this phone is left alone.
+export async function deleteMyAccount(): Promise<{ ok: boolean; error?: string }> {
+  if (!supabaseConfigured()) return { ok: false, error: 'Accounts are not switched on here.' }
+  const { createClient } = await import('./supabase')
+  const sb = createClient()
+  const { data } = await sb.auth.getSession()
+  const token = data.session?.access_token
+  if (!token) return { ok: false, error: 'Please sign in first.' }
+  const res = await fetch('/api/account/delete', { method: 'POST', headers: { Authorization: `Bearer ${token}` } })
+  const body = await res.json().catch(() => ({}))
+  if (!res.ok) return { ok: false, error: body.error || 'Could not delete the account.' }
+  await sb.auth.signOut().catch(() => {})
+  return { ok: true }
+}

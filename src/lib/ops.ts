@@ -93,14 +93,21 @@ export async function readIncidents(n = 30): Promise<Incident[]> {
 
 // ── crash reports from browsers, grouped by signature ──
 export type ErrorSample = { kind: string; page: string; message: string; source?: string; last: number }
+// Anyone can send an error report, so the store is capped: at most this many different errors a day. A flood of made-up
+// errors cannot fill the free Redis; the ones already counted keep counting.
+export const MAX_ERROR_SIGNATURES_PER_DAY = 300
+
 export async function recordClientError(sig: string, sample: Omit<ErrorSample, 'last'>): Promise<void> {
   if (!redisConfigured()) return
   const day = dayKey()
   try {
+    const [size, known] = (await redis([['HLEN', `ops:err:${day}`], ['HEXISTS', `ops:err:${day}`, sig]])) as [number, number]
+    if (!known && Number(size) >= MAX_ERROR_SIGNATURES_PER_DAY) return
     await redis([
       ['HINCRBY', `ops:err:${day}`, sig, 1],
       ['EXPIRE', `ops:err:${day}`, 9 * DAY],
-      ['HSET', 'ops:errsample', sig, JSON.stringify({ ...sample, last: Date.now() })],
+      ['HSET', `ops:errsample:${day}`, sig, JSON.stringify({ ...sample, last: Date.now() })],
+      ['EXPIRE', `ops:errsample:${day}`, 9 * DAY],
     ])
   } catch {}
 }
@@ -114,7 +121,7 @@ export async function readTopErrors(n = 10): Promise<(ErrorSample & { sig: strin
     pairs.sort((a, b) => b[1] - a[1])
     const top = pairs.slice(0, n)
     if (!top.length) return []
-    const samples = (await redis(top.map(([sig]) => ['HGET', 'ops:errsample', sig]))) as (string | null)[]
+    const samples = (await redis(top.map(([sig]) => ['HGET', `ops:errsample:${dayKey()}`, sig]))) as (string | null)[]
     return top.map(([sig, count], i) => ({ sig, count, ...(samples[i] ? JSON.parse(samples[i]!) : { kind: '?', page: '?', message: '?', last: 0 }) }))
   } catch {
     return []

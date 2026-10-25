@@ -189,3 +189,16 @@ alter table user_data enable row level security;
 drop policy if exists "own rows" on user_data;
 create policy "own rows" on user_data
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Hardening: give each role only what it needs (defence in depth on top of row-level security).
+--  • visitors who are not signed in ("anon") get no access to these tables at all
+--  • signed-in people ("authenticated") may read and write rows (row-level security limits them to their own),
+--    but not truncate a table or change its structure
+--  • the sign-up trigger function cannot be called through the public API
+-- ─────────────────────────────────────────────────────────────────────────────
+revoke all on all tables in schema public from anon;
+revoke truncate, references, trigger on all tables in schema public from authenticated;
+alter default privileges in schema public revoke all on tables from anon;
+alter default privileges in schema public revoke truncate, references, trigger on tables from authenticated;
+revoke execute on function public.handle_new_user() from public, anon, authenticated;

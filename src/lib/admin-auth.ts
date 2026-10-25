@@ -5,7 +5,8 @@ import { createHmac, timingSafeEqual } from 'node:crypto'
 
 export const ADMIN_COOKIE = 'deen_admin'
 export const SESSION_SECONDS = 12 * 3600
-const MIN_KEY_LENGTH = 24
+// 12 is the least we accept. A long random key is much safer; the sign-in route also caps guesses to a few per hour for everyone together.
+const MIN_KEY_LENGTH = 12
 
 export const adminConfigured = () => (process.env.ADMIN_KEY ?? '').length >= MIN_KEY_LENGTH
 

@@ -51,7 +51,8 @@
     "test:sleep": "node --import ./tests/register-ts.mjs --experimental-strip-types --no-warnings tests/sleep.test.mts",
     "test:autopilot": "node --import ./tests/register-ts.mjs --experimental-strip-types --no-warnings tests/autopilot.test.mts",
     "test:playback": "node --import ./tests/register-ts.mjs --experimental-strip-types --no-warnings tests/playback.test.mts",
-    "test:causes": "node --import ./tests/register-ts.mjs --experimental-strip-types --no-warnings tests/causes.test.mts"
+    "test:causes": "node --import ./tests/register-ts.mjs --experimental-strip-types --no-warnings tests/causes.test.mts",
+    "test:probe": "node tests/security-probe.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",

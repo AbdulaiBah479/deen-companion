@@ -6,6 +6,10 @@
 const CACHE = 'deen-v2'
 const SHELL = ['/offline', '/dashboard', '/quran', '/prayer', '/dhikr', '/more', '/icon.svg', '/icon-192.png']
 
+// Never keep these on a device: the owner's control room, the scheduler, reports, reminder sign-ups, accounts and AI questions.
+// (They can contain account e-mails or personal text, and a saved copy would outlive signing out.)
+const PRIVATE = (path) => /^\/(api\/(admin|cron|push|report|ai)|admin)(\/|$)/.test(path)
+
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches
@@ -20,7 +24,10 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches
       .keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE && !k.startsWith('deen-audio')).map((k) => caches.delete(k))))
+      // clean up anything private an earlier version of this file may have saved
+      .then(() => caches.open(CACHE))
+      .then((c) => c.keys().then((reqs) => Promise.all(reqs.filter((r) => PRIVATE(new URL(r.url).pathname)).map((r) => c.delete(r)))))
       .then(() => self.clients.claim())
   )
 })
@@ -56,7 +63,7 @@ self.addEventListener('fetch', (event) => {
     return
   }
   if (url.origin !== self.location.origin) return // other CDN requests go straight to the network
-  if (url.pathname === '/api/client-error' || url.pathname === '/api/health') return // never cache these
+  if (url.pathname === '/api/client-error' || url.pathname === '/api/health' || PRIVATE(url.pathname)) return // never cache these
 
   if (isStatic(url)) {
     event.respondWith(

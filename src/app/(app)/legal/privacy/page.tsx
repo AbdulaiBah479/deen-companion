@@ -62,8 +62,20 @@ export default function PrivacyPage() {
           within a minute. The hosting provider keeps ordinary server logs.
         </li>
         <li>
-          <strong>Accounts (optional).</strong> If you sign up to sync between devices, your email address and your saved progress are stored with our database
-          provider, Supabase, protected so that only you can read your rows. You can delete your account and data at any time by contacting us{contact ? ` at ${contact}` : ''}.
+          <strong>Accounts (optional).</strong> If you sign up to sync between devices, your name, email address and your saved progress are stored with our database
+          provider, Supabase (in Frankfurt), protected so that only you can read your rows. Your password is kept only in a scrambled, one-way form that nobody —
+          including us — can read. Sign-up does not currently ask you to confirm your email, so use an address you control. You can delete your account and its
+          online data yourself at any time: Settings → Account &amp; sync → “Delete my account”{contact ? ` (or write to ${contact})` : ''}. What is saved on your phone
+          stays on your phone until you clear it.
+        </li>
+        <li>
+          <strong>Reports you send.</strong> If you use “Report a problem”, we keep what you write, the page you sent it from, and the contact detail only if you
+          choose to give one. We use it to fix the problem and to reply if you asked us to. Please do not put secrets or other people’s private details in it.
+        </li>
+        <li>
+          <strong>Saved answers and counts.</strong> To make the AI faster and to stay within free limits, the answer to a question can be saved on our server and
+          shown again to someone who asks the same thing; it is stored against a scrambled fingerprint of the question, not against you. We also keep plain daily
+          totals (for example “how many AI questions were asked today”) with no personal details.
         </li>
       </ul>
 

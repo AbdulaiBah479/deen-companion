@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { askAI, prepareAI, sanitizeHistory } from '@/lib/ai'
 import { dataAvailable, getVerses } from '@/lib/data'
+import { readJsonLimited } from '@/lib/http'
 import { track } from '@/lib/ops'
 import { clientIp, rateLimit } from '@/lib/ratelimit'
 
@@ -24,13 +25,11 @@ function passageContext(ref: unknown, lang: string): string | undefined {
 }
 
 export async function POST(request: NextRequest) {
-  let body: { message?: unknown; history?: unknown; lang?: unknown; passage?: unknown; kids?: unknown; promptOnly?: unknown }
-  try {
-    body = await request.json()
-  } catch {
-    return NextResponse.json({ error: 'Request body must be valid JSON' }, { status: 400 })
-  }
-  const { message, history, lang, passage, kids, promptOnly } = body ?? {}
+  // A real question plus eight earlier turns is far below 40 KB; anything bigger is refused before it is even parsed.
+  const parsed = await readJsonLimited(request, 40_000)
+  if (!parsed || typeof parsed !== 'object') return NextResponse.json({ error: 'Request body must be valid JSON (and under 40 KB)' }, { status: 400 })
+  const body = parsed as { message?: unknown; history?: unknown; lang?: unknown; passage?: unknown; kids?: unknown; promptOnly?: unknown }
+  const { message, history, lang, passage, kids, promptOnly } = body
   // Finding the matching verses (promptOnly) costs no AI quota, so it gets its own, much larger allowance;
   // only real model calls count against the 15-a-minute limit.
   const limit = await rateLimit(promptOnly === true ? `ai-prep:${clientIp(request.headers)}` : `ai:${clientIp(request.headers)}`, promptOnly === true ? 60 : 15, 60_000)

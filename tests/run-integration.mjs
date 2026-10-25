@@ -72,6 +72,7 @@ if (!(await waitFor(APP_URL))) {
 const flags = ['--import', './tests/register-ts.mjs', '--experimental-strip-types', '--no-warnings']
 const results = {}
 results['API / AI resilience'] = await run('API & AI resilience', [...flags, 'tests/api.test.mjs'], { APP_URL })
+results['Security probe (hostile visitor)'] = await run('Security probe', ['tests/security-probe.mjs'], { BASE: APP_URL })
 // The API suite deliberately ends with a burst that trips the 15-requests-per-minute AI limiter. Let the window clear so the
 // browser suite (same address) isn't rate-limited.
 console.log('\n(waiting 62s for the AI rate-limit window to clear before the browser suite…)')

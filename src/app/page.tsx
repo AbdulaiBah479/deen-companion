@@ -1,22 +1,22 @@
 import Link from 'next/link'
 
 const FEATURES: [string, string, string][] = [
-  ['🎙', 'Quran Identifier', 'Shazam for Quran — identify any verse by listening'],
-  ['📖', 'Full Quran + Tafsir', 'All 114 surahs, word-by-word, Tafsir, 130+ reciters'],
-  ['🤖', 'AI Companion', 'Ask any Islamic question, get sourced answers instantly'],
-  ['📿', 'Hifz Coach', 'AI-scored memorization with spaced repetition'],
-  ['📚', 'Islamic Stories', 'Beautiful stories with real Quran ayahs and Hadith'],
+  ['🎙', 'Quran Identifier', 'Hear a recitation and find which verse it is'],
+  ['📖', 'Full Quran + Tafsir', 'All 114 surahs, word by word, tafsir, 25 reciters'],
+  ['🤖', 'AI Companion', 'Ask a question and get an answer that points to the Quran and hadith it is based on'],
+  ['📿', 'Hifz Coach', 'Memorise with spaced repetition and a recite-from-memory check'],
+  ['📚', 'Islamic Stories', '40 stories, each with the real Quran verses'],
   ['🕌', 'Prayer Tracker', 'Accurate times, reminders, streaks, journal'],
-  ['🧠', 'Quizzes & Games', '10 Islamic games, daily quiz, leaderboard'],
+  ['🧠', 'Quizzes & Games', 'Four games, a daily quiz and quizzes by topic'],
   ['🃏', 'Flashcards', 'Quranic vocab, 99 Names, duas — with SRS algorithm'],
-  ['💚', 'Donate & Zakat', 'Support Islamic causes, calculate your Zakat'],
+  ['💚', 'Zakat & Giving', 'Calculate your zakat and see where it can go — we never handle your money'],
 ]
 
 const STATS: [string, string][] = [
   ['114', 'Surahs with Tafsir'],
-  ['130+', 'Reciters'],
-  ['6', 'Hadith Books'],
-  ['100%', 'Free Forever'],
+  ['25', 'Reciters'],
+  ['9', 'Hadith collections'],
+  ['Free', 'No ads, no tracking'],
 ]
 
 const STORIES = [

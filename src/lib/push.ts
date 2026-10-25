@@ -168,6 +168,14 @@ export function messageFor(prayer: PrayerKey, time: string, leadMin: number) {
 export const dayIn = (tz: string, now: Date) => new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(now)
 
 // ───────── storage (Redis) ─────────
+// The scheduler visits every device every few minutes within one minute of run time, which comfortably handles about this many.
+// Past it, new sign-ups are paused (devices already signed up keep working) rather than letting reminders slip late for everyone.
+export const MAX_DEVICES = 10_000
+export async function roomForDevice(endpoint: string): Promise<boolean> {
+  const [n, has] = (await redis([['SCARD', 'push:ids'], ['EXISTS', `push:sub:${subId(endpoint)}`]])) as [number, number]
+  return Number(has) === 1 || Number(n) < MAX_DEVICES
+}
+
 export async function saveReminder(r: Reminder) {
   const id = subId(r.sub.endpoint)
   await redis([

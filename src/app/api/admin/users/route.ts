@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/admin-guard'
-import { createAdminClient } from '@/lib/supabase'
+import { createAdminClient } from '@/lib/supabase-admin'
 
 // GET    /api/admin/users          -> account count and the newest accounts (needs the Supabase service key)
 // DELETE /api/admin/users?id=<id>  -> delete an account and its saved progress

@@ -9,7 +9,7 @@ import { adminDeviceCount, sendAlert } from './alerts'
 import { aiCanary, configuredProviders, healModels } from './ai'
 import { dataAvailable } from './data'
 import { addIncident, flushCounters, readProviderStats, readStatuses, readTopErrors, writeStatuses, type ComponentState, type Status } from './ops'
-import { pushConfigured } from './push'
+import { MAX_DEVICES, pushConfigured } from './push'
 import { redis, redisConfigured } from './redis'
 
 export type Check = { id: string; label: string; critical: boolean; status: Status; ms?: number; detail: string }
@@ -146,6 +146,7 @@ export async function runChecks(): Promise<Check[]> {
       if (!pushConfigured()) return { status: 'degraded', detail: 'not configured (needs VAPID keys and Redis)' }
       const [n] = (await redis([['SCARD', 'push:ids']])) as [number]
       const admins = await adminDeviceCount()
+      if (Number(n) >= MAX_DEVICES * 0.8) return { status: 'degraded', detail: `${n} reminder devices — nearly full (new sign-ups pause at ${MAX_DEVICES.toLocaleString()}); time to move the scheduler to a bigger plan` }
       return { status: 'up', detail: `${n} subscribed device(s); ${admins} admin alert device(s)` }
     })
   )

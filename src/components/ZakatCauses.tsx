@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { CAUSE_CATEGORIES, ZAKAT_FIT_LABEL, ZAKAT_RECIPIENTS, type Cause } from '@/lib/causes-shared'
 
@@ -84,6 +85,12 @@ export default function ZakatCauses() {
                   </a>
                 ))}
               </div>
+              <p className="mt-2 text-[11px] text-gray-500">
+                Link wrong, or something looks suspicious?{' '}
+                <Link href={`/report?cat=abuse&ref=${encodeURIComponent('Zakat cause: ' + c.title)}&from=%2Fzakat`} className="underline">
+                  Tell us
+                </Link>
+              </p>
             </article>
           )
         })}

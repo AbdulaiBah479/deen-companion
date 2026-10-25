@@ -91,6 +91,8 @@ const c = (id: string, status: 'up' | 'degraded' | 'down', critical = false): Ch
   ok('admin: switched off when no key is set', !adminConfigured() && !keyIsCorrect('anything') && !sessionIsValid(makeSession()))
   process.env.ADMIN_KEY = 'short'
   ok('admin: a short key is refused (too guessable)', !adminConfigured())
+  process.env.ADMIN_KEY = 'twelve-chars'
+  ok('admin: a 12-character key is the shortest accepted', adminConfigured() && keyIsCorrect('twelve-chars') && !keyIsCorrect('twelve-charz'))
   process.env.ADMIN_KEY = 'a-long-private-key-that-only-the-owner-knows-0123'
   ok('admin: the right key is accepted, wrong ones are not', keyIsCorrect(process.env.ADMIN_KEY) && !keyIsCorrect('a-long-private-key-that-only-the-owner-knows-0124') && !keyIsCorrect('') && !keyIsCorrect(undefined) && !keyIsCorrect(12345))
   const t = makeSession(1_000_000_000_000)

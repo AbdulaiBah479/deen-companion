@@ -9,7 +9,7 @@ import { AR_SIZE, TR_SIZE, usePrefs, type Theme } from '@/lib/prefs'
 import { useStored } from '@/lib/storage'
 import { LOCAL_MODELS, detectWebGPU, isModelCached, loadLocalModel, removeModel, type GpuSupport, type LocalTier } from '@/lib/webllm'
 import { isSyncKey } from '@/lib/sync-core'
-import { signOut, supabaseConfigured, useSyncStatus } from '@/lib/sync'
+import { deleteMyAccount, signOut, supabaseConfigured, useSyncStatus } from '@/lib/sync'
 
 const CREDITS: [string, string, string][] = [
   ['Quran text, translations, tafsir, tajweed, word-by-word', 'Quran.Foundation (api.quran.com)', 'https://quran.foundation'],
@@ -26,6 +26,7 @@ const CREDITS: [string, string, string][] = [
 export default function SettingsPage() {
   const [kids, setKids] = useStored<boolean>('deen:kids', false)
   const sync = useSyncStatus()
+  const [deleteNote, setDeleteNote] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
   const [msg, setMsg] = useState('')
   const { prefs, set } = usePrefs()
@@ -220,9 +221,26 @@ export default function SettingsPage() {
               Signed in as <b>{sync.email}</b> ·{' '}
               {sync.state === 'syncing' ? 'syncing…' : sync.state === 'error' ? <span className="text-red-600">sync problem: {sync.message}</span> : 'synced ✓'}
             </p>
-            <button onClick={() => signOut()} className="px-3 py-1 rounded-lg border border-gray-300">
-              Sign out
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <button onClick={() => signOut()} className="px-3 py-1 rounded-lg border border-gray-300">
+                Sign out
+              </button>
+              <button
+                onClick={async () => {
+                  if (!confirm('Delete your account and the progress saved online? This cannot be undone. What is saved on this phone stays.')) return
+                  const r = await deleteMyAccount()
+                  setDeleteNote(r.ok ? 'Your account was deleted.' : r.error || 'Could not delete the account.')
+                }}
+                className="px-3 py-1 rounded-lg border border-red-300 text-red-700"
+              >
+                Delete my account
+              </button>
+            </div>
+            {deleteNote && (
+              <p className="text-xs text-gray-600" role="status">
+                {deleteNote}
+              </p>
+            )}
           </div>
         )}
       </section>

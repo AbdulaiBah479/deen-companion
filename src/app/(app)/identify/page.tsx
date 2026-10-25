@@ -156,7 +156,7 @@ export default function IdentifyPage() {
     <div>
       <h1 className="text-2xl font-black text-[#0F766E] mb-1">🎙 Quran Identifier</h1>
       <p className="text-gray-500 text-sm mb-5">
-        Recite or play a few seconds of a verse and find which ayah it is — like Shazam for the Quran.
+        Recite or play a few seconds of a verse and find which ayah it is, by listening.
       </p>
 
       <div className="bg-white border border-gray-200 rounded-2xl p-5 mb-5 space-y-3">

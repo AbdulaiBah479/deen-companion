@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { track } from '@/lib/ops'
-import { parseReminder, pushConfigured, saveReminder } from '@/lib/push'
+import { parseReminder, pushConfigured, roomForDevice, saveReminder } from '@/lib/push'
 import { clientIp, rateLimit } from '@/lib/ratelimit'
 
 // POST /api/push/subscribe — switch prayer reminders on (or update them). Body: { subscription, lat, lng, tz, method, prayers, leadMin }
@@ -20,6 +20,7 @@ export async function POST(request: NextRequest) {
   const reminder = parseReminder(body)
   if (!reminder) return NextResponse.json({ error: 'Invalid reminder settings' }, { status: 400 })
   try {
+    if (!(await roomForDevice(reminder.sub.endpoint))) return NextResponse.json({ error: 'Reminders are full right now. Please try again later.' }, { status: 503 })
     await saveReminder(reminder)
   } catch {
     return NextResponse.json({ error: 'Could not save right now' }, { status: 503 })

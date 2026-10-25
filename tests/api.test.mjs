@@ -208,6 +208,7 @@ ok('validation: oversize message -> 400', (await askPatient('a'.repeat(2500))).s
   ok('the offline fallback page exists', off.status === 200 && (await off.text()).includes("You’re offline"))
   const sw = await (await get('/sw.js')).text()
   ok('service worker is the v2 offline-capable one', sw.includes("'deen-v2'") && sw.includes("caches.match('/offline')"))
+  ok('service worker never saves private pages (admin, scheduler, reports, reminders, AI) on a device', sw.includes('const PRIVATE') && sw.includes('PRIVATE(url.pathname)') && sw.includes('(admin|cron|push|report|ai)'))
   ok('security.txt is published', (await get('/.well-known/security.txt')).status === 200)
 }
 

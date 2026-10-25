@@ -194,6 +194,17 @@ export async function healModels(force = false): Promise<{ found: Record<string,
   return result
 }
 
+// Ollama settings from the environment, or null when no model is chosen. The address always ends in /v1 (Ollama's OpenAI-compatible API).
+export function ollamaConfig(env: Record<string, string | undefined>): { base: string; key?: string; models: string[] } | null {
+  const models = list(env.OLLAMA_MODEL)
+  if (!models.length) return null
+  const key = env.OLLAMA_API_KEY?.trim() || undefined
+  let base = (env.OLLAMA_BASE_URL?.trim() || (key ? 'https://ollama.com' : 'http://localhost:11434')).replace(/[/]+$/, '')
+  if (!/^https?:[/][/]/i.test(base)) return null
+  if (!/[/]v1$/.test(base)) base += '/v1'
+  return { base, key, models }
+}
+
 export function configuredProviders(): Provider[] {
   const env = process.env
   const out: Provider[] = []
@@ -280,8 +291,18 @@ export function configuredProviders(): Provider[] {
       run: (system, history) => openAICompatible(env.CUSTOM_AI_BASE_URL!, env.CUSTOM_AI_KEY, env.CUSTOM_AI_MODEL || 'llama3.1', chat(system, history)),
     })
   }
-  // Groq answers in about a second, so it goes first; everything else keeps its order.
-  return [...out.filter((p) => /^Groq/.test(p.name)), ...out.filter((p) => !/^Groq/.test(p.name))]
+  // 7. Ollama: a local model (no quota, nothing leaves your machine) or Ollama Cloud. OLLAMA_MODEL picks the model(s), comma separated.
+  //    Local: OLLAMA_BASE_URL (default http://localhost:11434). Cloud: OLLAMA_API_KEY (base becomes https://ollama.com).
+  //    A hosted site (Vercel) cannot reach "localhost", so there the base URL must be an address on the internet (for example a tunnel).
+  const ollama = ollamaConfig(env)
+  if (ollama) {
+    ollama.models.forEach((model, i) =>
+      out.push({ name: i === 0 ? 'Ollama' : 'Ollama (' + model + ')', run: (system, history) => openAICompatible(override || ollama.base, ollama.key, model, chat(system, history)) })
+    )
+  }
+  // Groq answers in about a second, so it goes first; everything else keeps its order. OLLAMA_FIRST=on puts a local model first.
+  const first = /^(on|1|true|yes)$/i.test(env.OLLAMA_FIRST || '') ? /^(Groq|Ollama)/ : /^Groq/
+  return [...out.filter((p) => first.test(p.name)), ...out.filter((p) => !first.test(p.name))]
 }
 
 // ---------------- State shared across requests ----------------

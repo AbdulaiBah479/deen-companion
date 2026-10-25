@@ -3,7 +3,7 @@
 import http from 'node:http'
 import { AnswerCache, questionKey } from '../src/lib/answer-cache.ts'
 import { ProviderChain } from '../src/lib/ai-chain.ts'
-import { askAI, configuredProviders } from '../src/lib/ai.ts'
+import { askAI, configuredProviders, ollamaConfig } from '../src/lib/ai.ts'
 import { dataAvailable } from '../src/lib/data.ts'
 
 let fails = 0
@@ -11,7 +11,7 @@ const ok = (name: string, cond: boolean, info = '') => {
   console.log((cond ? 'PASS ' : 'FAIL ') + name + (info ? '  ' + info : ''))
   if (!cond) fails++
 }
-const KEYS = ['GEMINI_API_KEY', 'GEMINI_MODEL', 'GROQ_API_KEY', 'GROQ_MODEL', 'MISTRAL_API_KEY', 'MISTRAL_MODEL', 'CEREBRAS_API_KEY', 'CEREBRAS_MODEL', 'GITHUB_MODELS_TOKEN', 'SAMBANOVA_API_KEY', 'NVIDIA_API_KEY', 'HF_TOKEN', 'POLLINATIONS', 'POLLINATIONS_MODEL', 'OPENROUTER_API_KEY', 'OPENROUTER_MODEL', 'CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_AI_KEY', 'CUSTOM_AI_BASE_URL', 'AI_COMPAT_BASE_OVERRIDE', 'AI_DAILY_CALLS']
+const KEYS = ['GEMINI_API_KEY', 'GEMINI_MODEL', 'GROQ_API_KEY', 'GROQ_MODEL', 'MISTRAL_API_KEY', 'MISTRAL_MODEL', 'CEREBRAS_API_KEY', 'CEREBRAS_MODEL', 'GITHUB_MODELS_TOKEN', 'SAMBANOVA_API_KEY', 'NVIDIA_API_KEY', 'HF_TOKEN', 'POLLINATIONS', 'POLLINATIONS_MODEL', 'OPENROUTER_API_KEY', 'OPENROUTER_MODEL', 'CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_AI_KEY', 'CUSTOM_AI_BASE_URL', 'OLLAMA_MODEL', 'OLLAMA_BASE_URL', 'OLLAMA_API_KEY', 'OLLAMA_FIRST', 'AI_COMPAT_BASE_OVERRIDE', 'AI_DAILY_CALLS']
 const reset = () => KEYS.forEach((k) => delete process.env[k])
 const names = () => configuredProviders().map((p) => p.name)
 
@@ -58,6 +58,23 @@ Object.assign(process.env, { GEMINI_API_KEY: 'a', GROQ_API_KEY: 'b', MISTRAL_API
 const order = names()
 ok('order: fastest first (Groq, then Gemini, Mistral…), keyless/local last', order[0] === 'Groq' && order.indexOf('Gemini') < order.indexOf('Mistral') && order.indexOf('Mistral') < order.indexOf('OpenRouter') && order.indexOf('Pollinations') > order.indexOf('OpenRouter') && order.at(-1) === 'Custom', order.join())
 ok('a typical free setup has 10+ separate quotas to fall back on', order.length >= 10, String(order.length))
+
+// ───────── Ollama ─────────
+reset()
+ok('ollama: nothing is added until a model is chosen', !names().includes('Ollama'))
+process.env.OLLAMA_BASE_URL = 'http://localhost:11434'
+ok('ollama: a base address alone (no model) adds nothing', !names().includes('Ollama'))
+process.env.OLLAMA_MODEL = 'llama3.1,qwen2.5'
+ok('ollama: each model is its own provider', names().join() === 'Ollama,Ollama (qwen2.5)', names().join())
+const oc = ollamaConfig(process.env)
+ok('ollama: /v1 is added to the address, once', oc?.base === 'http://localhost:11434/v1' && ollamaConfig({ OLLAMA_MODEL: 'm', OLLAMA_BASE_URL: 'http://h:1/v1/' })?.base === 'http://h:1/v1')
+ok('ollama: with only a key it means Ollama Cloud', ollamaConfig({ OLLAMA_MODEL: 'gpt-oss:120b', OLLAMA_API_KEY: 'k' })?.base === 'https://ollama.com/v1' && ollamaConfig({ OLLAMA_MODEL: 'gpt-oss:120b', OLLAMA_API_KEY: 'k' })?.key === 'k')
+ok('ollama: a nonsense address is refused, not guessed', ollamaConfig({ OLLAMA_MODEL: 'm', OLLAMA_BASE_URL: 'javascript:alert(1)' }) === null && ollamaConfig({ OLLAMA_MODEL: 'm', OLLAMA_BASE_URL: 'file:///etc' }) === null)
+process.env.GROQ_API_KEY = 'g'
+ok('ollama: goes after the fast cloud providers by default…', names()[0] === 'Groq' && names().at(-1) === 'Ollama (qwen2.5)', names().join())
+process.env.OLLAMA_FIRST = 'on'
+ok('ollama: …and first (after Groq) with OLLAMA_FIRST=on', names().indexOf('Ollama') < names().indexOf('Groq (openai/gpt-oss-20b)') || names().indexOf('Ollama') <= 3, names().join())
+reset()
 
 // ───────── talking to a (fake) OpenAI-compatible server ─────────
 type Seen = { url: string; auth: string; model: string }

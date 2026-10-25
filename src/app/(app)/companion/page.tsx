@@ -3,7 +3,10 @@
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { Suspense, useEffect, useRef, useState } from 'react'
+import AnswerActions from '@/components/AnswerActions'
 import LangSelect from '@/components/LangSelect'
+import VoiceButton from '@/components/VoiceButton'
+import { followUps as suggestFollowUps, withScholarNote } from '@/lib/care'
 import { isRtl, useLang } from '@/lib/languages'
 import { useStored } from '@/lib/storage'
 import { detectWebGPU, isModelCached, loadLocalModel, localChat, LOCAL_MODELS, type GpuSupport, type LocalTier } from '@/lib/webllm'
@@ -14,7 +17,8 @@ type Msg = {
   text: string
   sources?: Source[]
   provider?: string | null
-  mode?: 'llm' | 'cache' | 'sources' | 'device'
+  mode?: 'llm' | 'cache' | 'sources' | 'device' | 'care'
+  followUps?: string[] // suggested next questions
   pending?: boolean // sources found, answer still being written
   question?: string // the user question this answer belongs to (lets us retry on-device)
 }
@@ -32,12 +36,21 @@ const MODE_LABEL: Record<string, string> = {
   cache: 'AI answer (saved — no tokens used)',
   sources: 'Sources only — no AI model answered',
   device: 'On-device AI (private, no quota)',
+  care: 'A caring reply — no AI model was used',
 }
+
+type Level = 'simple' | 'standard' | 'deep'
+const LEVELS: { id: Level; label: string; hint: string }[] = [
+  { id: 'simple', label: 'Simple', hint: 'Short and plain' },
+  { id: 'standard', label: 'Standard', hint: 'The usual answer' },
+  { id: 'deep', label: 'In-depth', hint: 'Context and scholarly views' },
+]
 
 function Companion() {
   const params = useSearchParams()
   const { lang } = useLang()
   const [kids] = useStored<boolean>('deen:kids', false)
+  const [level, setLevel] = useStored<Level>('deen:ai-level', 'standard')
   const [localTier, setLocalTier] = useStored<'off' | LocalTier>('deen:localai', 'off')
   const [messages, setMessages] = useState<Msg[]>([])
   const [input, setInput] = useState('')
@@ -72,9 +85,13 @@ function Companion() {
         await fetch('/api/ai', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message, history: hist, lang, passage: usePassage, kids, promptOnly: true }),
+          body: JSON.stringify({ message, history: hist, lang, passage: usePassage, kids, level, promptOnly: true }),
         })
       ).json()
+      if (prep.mode === 'care') {
+        setMessages((m) => [...m, { role: 'ai', text: prep.response, sources: prep.sources, provider: null, mode: 'care', question: message, followUps: [] }])
+        return
+      }
       if (!prep.system) throw new Error(prep.error || 'Could not prepare the question')
       const cached = await isModelCached(tier, !!gpu?.f16)
       if (!cached) setProgress({ pct: 0, text: `Downloading the ${LOCAL_MODELS[tier].label} model (${LOCAL_MODELS[tier].size}) — one time only…` })
@@ -85,6 +102,7 @@ function Companion() {
         setMessages((m) => m.map((x, i) => (i === m.length - 1 ? { ...x, text: partial } : x)))
       )
       if (!full) throw new Error('empty')
+      setMessages((m) => m.map((x, i) => (i === m.length - 1 ? { ...x, text: withScholarNote(message, full), followUps: suggestFollowUps(prep.sources ?? []) } : x)))
     } catch {
       setProgress(null)
       setMessages((m) => [...m.filter((x) => !(x.mode === 'device' && !x.text)), { role: 'ai', text: 'The on-device model could not run here. Try the “Fast” model, a different browser, or use the cloud AI.', mode: 'sources' }])
@@ -108,7 +126,7 @@ function Companion() {
     fetch('/api/ai', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message, history: hist, lang, passage: usePassage, kids, promptOnly: true }),
+      body: JSON.stringify({ message, history: hist, lang, passage: usePassage, kids, level, promptOnly: true }),
     })
       .then((r) => r.json())
       .then((p) => {
@@ -119,13 +137,13 @@ function Companion() {
       const res = await fetch('/api/ai', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message, history: hist, lang, passage: usePassage, kids }),
+        body: JSON.stringify({ message, history: hist, lang, passage: usePassage, kids, level }),
       })
       const data = await res.json()
       answered = true
       setMessages((m) => [
         ...m.filter((x) => !x.pending),
-        { role: 'ai', text: data.response || data.error || 'Something went wrong. Please try again.', sources: data.sources, provider: data.provider, mode: data.mode, question: message },
+        { role: 'ai', text: data.response || data.error || 'Something went wrong. Please try again.', sources: data.sources, provider: data.provider, mode: data.mode, question: message, followUps: data.followUps },
       ])
     } catch {
       answered = true
@@ -181,6 +199,14 @@ function Companion() {
           AI settings
         </Link>
       </div>
+      <div className="flex items-center gap-2 mb-3 text-xs" role="group" aria-label="How much detail">
+        <span className="text-gray-500 shrink-0">Answer:</span>
+        {LEVELS.map((l) => (
+          <button key={l.id} onClick={() => setLevel(l.id)} aria-pressed={level === l.id} title={l.hint} className={`px-3 py-1 rounded-full border ${level === l.id ? 'bg-[#0F766E] border-[#0F766E] text-white' : 'border-gray-300 bg-white'}`}>
+            {l.label}
+          </button>
+        ))}
+      </div>
       {passage && <p className="text-xs bg-[#0F766E]/10 text-[#0F766E] rounded-lg px-3 py-2 mb-3">Discussing Quran {passage}</p>}
 
       <div className="flex-1 space-y-3 mb-4">
@@ -194,7 +220,7 @@ function Companion() {
           </div>
         )}
         {messages.map((m, i) => (
-          <div key={i} className={m.role === 'user' ? 'flex justify-end' : ''}>
+          <div key={i} data-role={m.role} className={m.role === 'user' ? 'flex justify-end' : ''}>
             <div
               dir={isRtl(lang) ? 'rtl' : 'ltr'}
               className={`max-w-[92%] rounded-2xl px-4 py-3 whitespace-pre-wrap leading-relaxed ${m.role === 'user' ? 'bg-[#0F766E] text-white' : 'bg-white border border-gray-200'}`}
@@ -220,6 +246,16 @@ function Companion() {
               </div>
             )}
             {m.role === 'ai' && m.mode && <p className="text-[10px] text-gray-500 mt-1">{MODE_LABEL[m.mode]}{m.provider ? ` · ${m.provider}` : ''}</p>}
+            {m.role === 'ai' && m.text && !m.pending && <AnswerActions text={m.text} question={m.question} lang={lang} canRate={m.mode === 'llm' || m.mode === 'cache' || m.mode === 'device'} />}
+            {m.role === 'ai' && i === messages.length - 1 && !busy && !m.pending && m.followUps && m.followUps.length > 0 && (
+              <div className="flex flex-wrap gap-2 mt-2" role="group" aria-label="Suggested next questions">
+                {m.followUps.map((f) => (
+                  <button key={f} onClick={() => send(f, passage)} className="px-3 py-1.5 rounded-full border border-[#0F766E] text-[#0F766E] text-xs font-semibold bg-white">
+                    {f}
+                  </button>
+                ))}
+              </div>
+            )}
             {m.role === 'ai' && m.mode === 'sources' && m.question && gpu?.ok && !busy && (
               <button
                 onClick={() => answerOnDevice(m.question!, passage, history().slice(0, -1))}
@@ -247,7 +283,7 @@ function Companion() {
           e.preventDefault()
           send(input, passage)
         }}
-        className="flex gap-2 sticky bottom-36 md:bottom-24"
+        className="flex flex-wrap gap-2 sticky bottom-36 md:bottom-24"
       >
         <input
           value={input}
@@ -257,6 +293,7 @@ function Companion() {
           aria-label="Your question"
           className="flex-1 px-4 py-3 rounded-xl border border-gray-300 bg-white focus:outline-none focus:border-[#0F766E]"
         />
+        <VoiceButton lang={lang} disabled={busy} onText={(t) => setInput(t)} />
         <button type="submit" disabled={busy || !input.trim()} className="px-5 py-3 rounded-xl bg-[#0F766E] text-white font-semibold disabled:opacity-50">
           Send
         </button>

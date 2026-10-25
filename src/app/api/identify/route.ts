@@ -6,34 +6,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { dataAvailable, matchRecitation } from '@/lib/data'
 import { clientIp, rateLimit } from '@/lib/ratelimit'
+import { NotConfigured, transcribeAudio } from '@/lib/stt'
 
 const MAX_AUDIO_BYTES = 4 * 1024 * 1024
 
-async function transcribe(file: File): Promise<string> {
-  const base = process.env.STT_BASE_URL || 'https://api.groq.com/openai/v1'
-  const key = process.env.STT_KEY || process.env.GROQ_API_KEY
-  const model = process.env.STT_MODEL || 'whisper-large-v3-turbo'
-  if (!key && !process.env.STT_BASE_URL) throw new NotConfigured()
 
-  const fd = new FormData()
-  fd.append('file', file, file.name || 'recitation.webm')
-  fd.append('model', model)
-  fd.append('language', 'ar')
-  fd.append('response_format', 'json')
-  fd.append('temperature', '0')
-  // A short Arabic prompt nudges Whisper toward Quranic vocabulary and spelling.
-  fd.append('prompt', 'بسم الله الرحمن الرحيم قرآن كريم')
-  const res = await fetch(`${base.replace(/\/$/, '')}/audio/transcriptions`, {
-    method: 'POST',
-    headers: key ? { Authorization: `Bearer ${key}` } : {},
-    body: fd,
-    signal: AbortSignal.timeout(45000),
-  })
-  if (!res.ok) throw new Error(`transcription failed (${res.status})`)
-  return ((await res.json()).text as string) || ''
-}
-
-class NotConfigured extends Error {}
 
 export async function POST(request: NextRequest) {
   const limit = await rateLimit(`identify:${clientIp(request.headers)}`, 12, 60_000)
@@ -57,7 +34,8 @@ export async function POST(request: NextRequest) {
       if (!(audio instanceof File)) return NextResponse.json({ error: 'Provide an audio file' }, { status: 400 })
       if (audio.size === 0) return NextResponse.json({ error: 'The recording is empty' }, { status: 400 })
       if (audio.size > MAX_AUDIO_BYTES) return NextResponse.json({ error: 'Recording too long. Keep it under ~30 seconds.' }, { status: 413 })
-      transcript = await transcribe(audio)
+      // A short Arabic prompt nudges Whisper toward Quranic vocabulary and spelling.
+      transcript = await transcribeAudio(audio, { language: 'ar', prompt: 'بسم الله الرحمن الرحيم قرآن كريم' })
     } else {
       return NextResponse.json({ error: 'Send JSON { text } or multipart audio' }, { status: 415 })
     }

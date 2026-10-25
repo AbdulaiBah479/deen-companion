@@ -63,12 +63,12 @@ export class AnswerCache<T> {
 const FILLER = new Set(['please', 'pls', 'kindly', 'could', 'can', 'would', 'you', 'tell', 'me', 'the', 'a', 'an', 'hi', 'hello', 'salam', 'salaam', 'assalamu', 'alaikum', 'alaykum', 'brother', 'sister', 'sheikh', 'dear', 'thanks', 'thank', 'i', 'want', 'to', 'know', 'explain'])
 
 // Same question, differently typed, should hit the same entry.
-export function questionKey(parts: { message: string; lang: string; kids: boolean; passage?: string }): string {
+export function questionKey(parts: { message: string; lang: string; kids: boolean; passage?: string; level?: string }): string {
   const q = parts.message
     .toLowerCase()
     .normalize('NFKD')
     .replace(/[^\p{L}\p{N}\s]/gu, ' ')
     .replace(/\s+/g, ' ')
     .trim()
-  return `${parts.lang}|${parts.kids ? 'k' : 'a'}|${(parts.passage ?? '').replaceAll('|', ' ')}|${q}`
+  return `${parts.lang}|${parts.kids ? 'k' : 'a'}|${parts.level ? parts.level + '|' : ''}${(parts.passage ?? '').replaceAll('|', ' ')}|${q}`
 }

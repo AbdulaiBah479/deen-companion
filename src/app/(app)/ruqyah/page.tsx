@@ -1,12 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import { useState } from 'react'
-import { useAudio } from '@/lib/audio'
-import { BEWARE, DUAS, QURAN_ITEMS, UNDERSTAND, UNDERSTAND_SOURCES, type QuranItem, type Source } from '@/lib/ruqyah'
-import { useLang } from '@/lib/languages'
-
-type Verse = { verse_number: number; text_uthmani: string; translations: { text: string }[] }
+import PassageCard from '@/components/PassageCard'
+import { BEWARE, DUAS, QURAN_ITEMS, UNDERSTAND, UNDERSTAND_SOURCES, type Source } from '@/lib/ruqyah'
 
 function Sources({ list }: { list: Source[] }) {
   return (
@@ -25,61 +21,6 @@ function Sources({ list }: { list: Source[] }) {
         </span>
       ))}
     </p>
-  )
-}
-
-function QuranCard({ item }: { item: QuranItem }) {
-  const audio = useAudio()
-  const { lang } = useLang()
-  const [verses, setVerses] = useState<Verse[] | null>(null)
-  const [failed, setFailed] = useState(false)
-  const playingThis = audio.range?.surah === item.surah && audio.range.from === item.from && audio.range.to === item.to
-
-  function load() {
-    if (verses || failed) return
-    fetch(`/api/quran/passage?surah=${item.surah}&from=${item.from}&to=${item.to}&lang=${lang}`)
-      .then((r) => r.json())
-      .then((d) => (d.verses ? setVerses(d.verses) : setFailed(true)))
-      .catch(() => setFailed(true))
-  }
-
-  return (
-    <article className="bg-white border border-gray-200 rounded-2xl p-4">
-      <div className="flex items-start justify-between gap-2">
-        <h3 className="font-bold">{item.title}</h3>
-        <span className="text-xs text-gray-500 shrink-0">
-          {item.surah}:{item.from}
-          {item.to > item.from ? `–${item.to}` : ''}
-        </span>
-      </div>
-      <p className="text-sm text-gray-700 mt-1">{item.note}</p>
-      <div className="flex flex-wrap items-center gap-2 mt-3">
-        <button
-          onClick={() => (playingThis && audio.playing ? audio.toggle() : audio.playRange(item.surah, item.from, item.to, item.loops))}
-          className="px-3 py-2 rounded-lg bg-[#0F766E] text-white text-sm font-semibold"
-          aria-label={`Listen to ${item.title}${item.loops > 1 ? `, ${item.loops} times` : ''}`}
-        >
-          {playingThis && audio.playing ? '⏸ Pause' : `▶ Listen${item.loops > 1 ? ` · ${item.loops} times` : ''}`}
-        </button>
-        {item.loops > 1 && <span className="text-xs text-gray-500">as the Sunnah gives it</span>}
-      </div>
-      <details className="mt-3" onToggle={(e) => (e.currentTarget as HTMLDetailsElement).open && load()}>
-        <summary className="cursor-pointer text-sm font-semibold text-[#0F766E]">Read the verses</summary>
-        <div className="mt-2 space-y-3">
-          {failed && <p className="text-sm text-red-600">Could not load the verses. Check your connection.</p>}
-          {!verses && !failed && <p className="text-sm text-gray-500">Loading…</p>}
-          {verses?.map((v) => (
-            <div key={v.verse_number}>
-              <p className="text-right text-xl leading-[2.1]" dir="rtl" lang="ar" style={{ fontFamily: 'var(--font-quran), serif' }}>
-                {v.text_uthmani}
-              </p>
-              <p className="text-sm text-gray-700">{v.translations[0]?.text}</p>
-            </div>
-          ))}
-        </div>
-      </details>
-      <Sources list={item.sources} />
-    </article>
   )
 }
 
@@ -110,7 +51,7 @@ export default function RuqyahPage() {
         <h2 id="h-quran" className="font-bold text-lg">From the Qur’an</h2>
         <p className="text-sm text-gray-600">Press Listen to hear it in your chosen reciter’s voice. Use the 🎯 button in the player to repeat each verse, or to pause so you can recite after the reciter.</p>
         {QURAN_ITEMS.map((q) => (
-          <QuranCard key={q.id} item={q} />
+          <PassageCard key={q.id} title={q.title} note={q.note} surah={q.surah} from={q.from} to={q.to} loops={q.loops} footer={<Sources list={q.sources} />} />
         ))}
       </section>
 

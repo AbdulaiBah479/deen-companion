@@ -45,6 +45,8 @@ export default function HifzPage() {
   const recRef = useRef<SR | null>(null)
   const heardRef = useRef('')
   const [hasSR, setHasSR] = useState(false)
+  const [canRecord, setCanRecord] = useState(false) // no built-in speech recognition, but the device can record: the server listens instead
+  const mediaRef = useRef<MediaRecorder | null>(null)
   const [reciting, setReciting] = useState(false)
   const [result, setResult] = useState<{ words: string[]; matched: boolean[]; score: number } | null>(null)
 
@@ -54,9 +56,11 @@ export default function HifzPage() {
       .then((d) => setSurahs(d.surahs || []))
       .catch(() => setError('Could not load surahs.'))
     setHasSR(!!getSR())
+    setCanRecord(typeof MediaRecorder !== 'undefined' && !!navigator.mediaDevices?.getUserMedia)
     return () => {
       audioRef.current?.pause()
       recRef.current?.stop()
+      mediaRef.current?.stream.getTracks().forEach((t) => t.stop())
     }
   }, [])
 
@@ -154,6 +158,41 @@ export default function HifzPage() {
     setReciting(true)
   }
 
+  // For browsers without speech recognition (many iPhones, Firefox): record up to 20 seconds and let the server's Whisper listen.
+  async function reciteViaServer(expected: string) {
+    setResult(null)
+    setError('')
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const rec = new MediaRecorder(stream)
+      const chunks: BlobPart[] = []
+      rec.ondataavailable = (e) => e.data.size && chunks.push(e.data)
+      rec.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop())
+        setReciting(false)
+        const blob = new Blob(chunks, { type: rec.mimeType || 'audio/webm' })
+        if (blob.size < 1500) return setError('I did not hear anything. Try again.')
+        try {
+          const fd = new FormData()
+          fd.append('audio', blob, 'recitation.webm')
+          const res = await fetch('/api/identify', { method: 'POST', body: fd })
+          const d = await res.json().catch(() => ({}))
+          if (!res.ok) throw new Error(d.error || 'Could not check the recitation.')
+          setResult(compareRecitation(expected, d.transcript || ''))
+          setRevealed(true)
+        } catch (e) {
+          setError(e instanceof Error ? e.message : 'Could not check the recitation.')
+        }
+      }
+      mediaRef.current = rec
+      rec.start()
+      setReciting(true)
+      setTimeout(() => rec.state === 'recording' && rec.stop(), 20000)
+    } catch {
+      setError('The microphone is not available. Allow it in your browser settings, then try again.')
+    }
+  }
+
   // Review session
   if (queue) {
     const cur = queue[0]
@@ -187,14 +226,14 @@ export default function HifzPage() {
               <button onClick={() => play(cur.surah, cur.verse)} className="text-[#0F766E] font-semibold text-sm">
                 ▶ Hear it
               </button>
-              {hasSR && (
+              {(hasSR || canRecord) && (
                 <div className="mt-3">
                   {!reciting ? (
-                    <button onClick={() => recite(verse.text_uthmani)} className="text-[#0F766E] font-semibold text-sm border border-[#0F766E] rounded-lg px-3 py-1">
+                    <button onClick={() => (hasSR ? recite(verse.text_uthmani) : void reciteViaServer(verse.text_uthmani))} className="text-[#0F766E] font-semibold text-sm border border-[#0F766E] rounded-lg px-3 py-1">
                       🎤 Recite it &amp; check
                     </button>
                   ) : (
-                    <button onClick={() => recRef.current?.stop()} className="bg-red-600 text-white font-semibold text-sm rounded-lg px-3 py-1 animate-pulse">
+                    <button onClick={() => (hasSR ? recRef.current?.stop() : mediaRef.current?.stop())} className="bg-red-600 text-white font-semibold text-sm rounded-lg px-3 py-1 animate-pulse">
                       ⏹ Done reciting
                     </button>
                   )}

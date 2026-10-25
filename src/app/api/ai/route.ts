@@ -1,11 +1,13 @@
-// POST /api/ai  { message, history?, lang?, passage?, kids? }  ->  { response, sources, provider, mode }
-//   mode: 'llm' (model answer) | 'cache' (re-used answer, zero tokens) | 'sources' (built from retrieved sources only)
+// POST /api/ai  { message, history?, lang?, passage?, kids?, level? }  ->  { response, sources, provider, mode, followUps }
+//   mode: 'llm' (model answer) | 'cache' (re-used answer, zero tokens) | 'sources' (built from retrieved sources only) | 'care' (a kind fixed reply for someone in distress)
+//   level: 'simple' | 'standard' | 'deep' — how much detail
 // With { promptOnly: true } it returns { system, history, sources } so the browser can run an on-device model instead.
 // `passage` is a verse reference like "2:255" or "12:4-18"; the server looks up the actual text itself,
 // so the client can never inject arbitrary instructions through it.
 
 import { NextRequest, NextResponse } from 'next/server'
-import { askAI, prepareAI, sanitizeHistory } from '@/lib/ai'
+import { askAI, careResult, isLevel, prepareAI, sanitizeHistory } from '@/lib/ai'
+import { needsCare } from '@/lib/care'
 import { dataAvailable, getVerses } from '@/lib/data'
 import { readJsonLimited } from '@/lib/http'
 import { track } from '@/lib/ops'
@@ -28,8 +30,9 @@ export async function POST(request: NextRequest) {
   // A real question plus eight earlier turns is far below 40 KB; anything bigger is refused before it is even parsed.
   const parsed = await readJsonLimited(request, 40_000)
   if (!parsed || typeof parsed !== 'object') return NextResponse.json({ error: 'Request body must be valid JSON (and under 40 KB)' }, { status: 400 })
-  const body = parsed as { message?: unknown; history?: unknown; lang?: unknown; passage?: unknown; kids?: unknown; promptOnly?: unknown }
+  const body = parsed as { message?: unknown; history?: unknown; lang?: unknown; passage?: unknown; kids?: unknown; promptOnly?: unknown; level?: unknown }
   const { message, history, lang, passage, kids, promptOnly } = body
+  const level = isLevel(body.level) ? body.level : 'standard'
   // Finding the matching verses (promptOnly) costs no AI quota, so it gets its own, much larger allowance;
   // only real model calls count against the 15-a-minute limit.
   const limit = await rateLimit(promptOnly === true ? `ai-prep:${clientIp(request.headers)}` : `ai:${clientIp(request.headers)}`, promptOnly === true ? 60 : 15, 60_000)
@@ -50,12 +53,18 @@ export async function POST(request: NextRequest) {
   const language = typeof lang === 'string' ? lang : 'en'
   try {
     if (promptOnly === true) {
+      // Someone in distress is never handed to a model, not even the one on their own phone: they get the caring reply.
+      if (needsCare(message)) {
+        const c = careResult(language, String(message))
+        return NextResponse.json({ response: c.answer, sources: c.sources, provider: null, mode: 'care', followUps: [] })
+      }
       const p = prepareAI({
         message: message.trim(),
         history: sanitizeHistory(history),
         lang: language,
         context: passageContext(passage, language),
         kids: kids === true,
+        level,
       })
       return NextResponse.json({ system: p.system, history: p.history, sources: p.sources })
     }
@@ -65,9 +74,10 @@ export async function POST(request: NextRequest) {
       lang: language,
       context: passageContext(passage, language),
       kids: kids === true,
+      level,
     })
     track('ai.' + result.mode)
-    return NextResponse.json({ response: result.answer, sources: result.sources, provider: result.provider, mode: result.mode })
+    return NextResponse.json({ response: result.answer, sources: result.sources, provider: result.provider, mode: result.mode, followUps: result.followUps ?? [] })
   } catch (error) {
     console.error('AI API Error:', error)
     return NextResponse.json({ error: 'Something went wrong. Please try again.' }, { status: 500 })

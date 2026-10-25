@@ -9,7 +9,7 @@
 
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import { LANGUAGES } from './language-list'
-import { dataAvailable, searchHadithText, searchQuranText } from './data'
+import { dataAvailable, getVerses, searchHadithText, searchQuranText } from './data'
 import { AnswerCache, questionKey } from './answer-cache'
 import { ProviderChain, ProviderError, type ChatTurn, type Provider } from './ai-chain'
 import { extractiveAnswer } from './extractive'
@@ -17,6 +17,7 @@ import { createHash } from 'node:crypto'
 import { redis, redisConfigured } from './redis'
 import { readDiscoveredModels, recordProviderStat, track, writeDiscoveredModels } from './ops'
 import { discoverModels } from './model-discovery'
+import { CARE_VERSES, careLang, careText, followUps, needsCare, withScholarNote } from './care'
 
 export type { ChatTurn } from './ai-chain'
 
@@ -32,7 +33,16 @@ export type Source = {
 
 // mode: 'llm' = written by an AI model, 'cache' = a previous model answer re-used (zero tokens),
 // 'sources' = assembled from retrieved verses/hadith only (zero tokens, no model involved).
-export type AIResult = { answer: string; sources: Source[]; provider: string | null; mode: 'llm' | 'cache' | 'sources' }
+export type AIResult = { answer: string; sources: Source[]; provider: string | null; mode: 'llm' | 'cache' | 'sources' | 'care'; followUps?: string[] }
+
+// How much detail the person wants: a short plain explanation, the usual answer, or a fuller one with context and scholarly views.
+export type Level = 'simple' | 'standard' | 'deep'
+export const isLevel = (v: unknown): v is Level => v === 'simple' || v === 'standard' || v === 'deep'
+const LEVEL_RULE: Record<Level, string> = {
+  simple: '\n9. LEVEL: Explain very simply, in short sentences, for a beginner or a young reader. At most two short paragraphs. Explain any Arabic word you use.',
+  standard: '',
+  deep: '\n9. LEVEL: Give a fuller answer (about six to eight short paragraphs): the context, the key Arabic terms and their meanings, how the main scholars or schools understood it, and the practical lessons. Still cite SOURCES, and say clearly where you are unsure.',
+}
 
 // ---------------- Retrieval ----------------
 
@@ -75,7 +85,7 @@ const KIDS_RULE =
 
 const langName = (code: string) => LANGUAGES.find((l) => l.code === code)?.name ?? 'English'
 
-export function buildSystemPrompt(sources: Source[], lang = 'en', context?: string, kids = false): string {
+export function buildSystemPrompt(sources: Source[], lang = 'en', context?: string, kids = false, level: Level = 'standard'): string {
   const sourceBlock = sources.length
     ? sources.map((s) => `[${s.id}] ${s.kind === 'quran' ? 'Quran' : 'Hadith'} ${s.ref}: ${s.text}`).join('\n')
     : '(no matching sources were found for this question)'
@@ -93,7 +103,7 @@ RULES:
 5. Write "ﷺ" after the Prophet Muhammad's name and "عليه السلام" after other prophets' names.
 6. Be kind and encouraging, never judgmental. Keep answers clear and concise (about 3–5 short paragraphs).
 7. Reply in ${langName(lang)}.
-8. If the question is not about Islam or self-development, politely steer back to what you can help with.${kids ? KIDS_RULE : ''}`
+8. If the question is not about Islam or self-development, politely steer back to what you can help with.${LEVEL_RULE[level]}${kids ? KIDS_RULE : ''}`
 }
 
 // ---------------- Providers ----------------
@@ -323,25 +333,51 @@ export function trimHistory(history: ChatTurn[], budgetChars = 6000): ChatTurn[]
   return out
 }
 
-type AskOptions = { message: string; history?: ChatTurn[]; lang?: string; context?: string; kids?: boolean }
+type AskOptions = { message: string; history?: ChatTurn[]; lang?: string; context?: string; kids?: boolean; level?: Level }
 
 // Everything needed to run the model somewhere else (e.g. in the user's own browser).
 export function prepareAI(opts: AskOptions) {
   const lang = opts.lang && LANGUAGES.some((l) => l.code === opts.lang) ? opts.lang : 'en'
   const sources = retrieveSources(opts.message, lang)
-  const system = buildSystemPrompt(sources, lang, opts.context?.slice(0, 4000), !!opts.kids)
+  const system = buildSystemPrompt(sources, lang, opts.context?.slice(0, 4000), !!opts.kids, opts.level ?? 'standard')
   const history = trimHistory([...(opts.history ?? []), { role: 'user' as const, content: opts.message }])
   return { lang, sources, system, history }
 }
 
+// A kind, fixed reply (no AI model) for someone who writes that they want to die or hurt themselves, with verses of hope.
+export function careResult(langIn?: string, message = ''): AIResult {
+  const textLang = careLang(message, langIn)
+  const lang = langIn && LANGUAGES.some((l) => l.code === langIn) ? langIn : 'en' // the language the verses are translated into
+  const sources: Source[] = dataAvailable()
+    ? CARE_VERSES.flatMap(([s, a], i) => {
+        const v = getVerses(s, lang, a, a)[0]
+        return v ? [{ id: `Q${i + 1}`, kind: 'quran' as const, ref: `${s}:${a}`, arabic: v.text_uthmani, text: v.translations[0]?.text ?? '', href: `/quran/${s}` }] : []
+      })
+    : []
+  return { answer: careText(textLang), sources, provider: null, mode: 'care', followUps: [] }
+}
+
+// The answer people see: adds a "ask a scholar / doctor" note where the question calls for one, and suggests next questions.
+function finish(opts: AskOptions, r: AIResult): AIResult {
+  return { ...r, answer: withScholarNote(opts.message, r.answer), followUps: r.followUps ?? followUps(r.sources) }
+}
+
 export async function askAI(opts: AskOptions): Promise<AIResult> {
+  if (needsCare(opts.message)) {
+    track('ai.care')
+    return careResult(opts.lang, opts.message)
+  }
+  return finish(opts, await askAIInner(opts))
+}
+
+async function askAIInner(opts: AskOptions): Promise<AIResult> {
   const { lang, sources, system, history } = prepareAI(opts)
   track('ai.ask')
   await refreshDiscovered()
 
   // 1. Cache: a repeated standalone question costs nothing.
   const cacheable = !(opts.history && opts.history.length)
-  const key = questionKey({ message: opts.message, lang, kids: !!opts.kids, passage: opts.context?.slice(0, 80) })
+  const key = questionKey({ message: opts.message, lang, kids: !!opts.kids, passage: opts.context?.slice(0, 80), level: opts.level && opts.level !== 'standard' ? opts.level : undefined })
   if (cacheable) {
     const hit = cache.get(key) ?? cache.getSimilar(key)
     if (hit) return { answer: hit.answer, sources, provider: hit.provider, mode: 'cache' }

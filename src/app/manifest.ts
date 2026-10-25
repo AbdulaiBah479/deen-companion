@@ -15,5 +15,13 @@ export default function manifest(): MetadataRoute.Manifest {
       { src: '/icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
       { src: '/icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' },
     ],
+    // Long-press the installed icon (Android) to jump straight in.
+    shortcuts: [
+      { name: 'Read the Quran', short_name: 'Quran', url: '/quran', icons: [{ src: '/icon-192.png', sizes: '192x192', type: 'image/png' }] },
+      { name: 'Prayer times', short_name: 'Prayer', url: '/prayer', icons: [{ src: '/icon-192.png', sizes: '192x192', type: 'image/png' }] },
+      { name: 'Qibla direction', short_name: 'Qibla', url: '/qibla', icons: [{ src: '/icon-192.png', sizes: '192x192', type: 'image/png' }] },
+      { name: 'Ask the AI companion', short_name: 'Ask AI', url: '/companion', icons: [{ src: '/icon-192.png', sizes: '192x192', type: 'image/png' }] },
+    ],
+    categories: ['lifestyle', 'education', 'books'],
   }
 }

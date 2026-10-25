@@ -193,6 +193,7 @@ ok('validation: oversize message -> 400', (await askPatient('a'.repeat(2500))).s
   const get = (p) => fetch(APP + p)
   const m = await (await get('/manifest.webmanifest')).json()
   const png = m.icons.filter((i) => i.type === 'image/png')
+  ok('manifest: long-pressing the installed icon offers Quran, Prayer, Qibla and AI shortcuts that open real pages', m.shortcuts?.length === 4 && m.shortcuts.every((s) => s.url.startsWith('/') && s.name && s.icons?.length), JSON.stringify(m.shortcuts?.map((s) => s.url)))
   ok('manifest: has 192 and 512 PNG icons and a maskable one (needed to install on Android)', png.some((i) => i.sizes === '192x192') && png.some((i) => i.sizes === '512x512') && png.some((i) => i.purpose === 'maskable'))
   const served = await Promise.all([...png.map((i) => get(i.src)), get('/apple-touch-icon.png')])
   ok('every listed icon (and the iPhone icon) is served as an image', served.every((r) => r.status === 200 && (r.headers.get('content-type') || '').startsWith('image/png')))
@@ -393,6 +394,55 @@ ok('validation: oversize message -> 400', (await askPatient('a'.repeat(2500))).s
   ok('passage: the last two verses of Al-Baqarah come back as two verses', end.verses?.length === 2 && end.verses[1].verse_number === 286)
   ok('passage: bad requests are refused', (await fetch(`${APP}/api/quran/passage?surah=0&from=1`)).status === 400 && (await fetch(`${APP}/api/quran/passage?surah=2&from=5&to=2`)).status === 400 && (await fetch(`${APP}/api/quran/passage?surah=2&from=1&lang=xx`)).status === 400)
   ok('passage: at most 12 verses at a time', (await (await fetch(`${APP}/api/quran/passage?surah=2&from=1&to=200`)).json()).verses.length === 12)
+}
+
+// ───────── AI levels, the caring reply, the scholar note, follow-ups ─────────
+{
+  const ai = async (body) => {
+    const r = await fetch(`${APP}/api/ai`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': '203.0.113.60' }, body: JSON.stringify(body) })
+    return { status: r.status, ...(await r.json()) }
+  }
+  const llmCalls = async () => (await (await fetch(`${LLM}/stats`)).json()).calls
+  const q = 'What does the Quran say about gratitude and thankfulness?'
+  const simple = await ai({ message: q + ' (simple)', level: 'simple' })
+  const deep = await ai({ message: q + ' (deep)', level: 'deep' })
+  const normal = await ai({ message: q + ' (normal)' })
+  ok('level: "simple" asks the model to explain very simply', /LEVEL: Explain very simply/.test(simple.response), simple.mode)
+  ok('level: "deep" asks for the fuller answer with context and scholarly views', /LEVEL: Give a fuller answer/.test(deep.response))
+  ok('level: the usual answer carries no level instruction, and a made-up level is treated as usual', !/LEVEL:/.test(normal.response) && !/LEVEL:/.test((await ai({ message: q + ' (odd)', level: 'banana' })).response))
+  ok('level: the same question at different levels is not mixed up in the saved answers', (await ai({ message: q + ' (simple)', level: 'simple' })).response !== (await ai({ message: q + ' (simple)', level: 'deep' })).response)
+
+  const before = await llmCalls()
+  const care = await ai({ message: 'I want to kill myself' })
+  ok('care: someone in distress gets the caring reply, not an AI answer', care.status === 200 && care.mode === 'care' && care.provider === null && /findahelpline\.com/.test(care.response) && /emergency number/.test(care.response))
+  ok('care: it comes with verses of hope (39:53, 2:286, 94:5-6)', ['39:53', '2:286', '94:5', '94:6'].every((k) => care.sources?.some((s) => s.ref === k)), (care.sources ?? []).map((s) => s.ref).join())
+  ok('care: no AI model was called for it', (await llmCalls()) === before)
+  const careDevice = await ai({ message: 'i want to die', promptOnly: true })
+  ok('care: even the on-device path gets the caring reply instead of a prompt', careDevice.mode === 'care' && careDevice.system === undefined && /findahelpline\.com/.test(careDevice.response))
+  const careAr = await ai({ message: 'أريد أن أموت', lang: 'ar' })
+  ok('care: it answers in Arabic for an Arabic message', careAr.mode === 'care' && /findahelpline.com/.test(careAr.response) && (careAr.response.match(/[؀-ۿ]/g) || []).length > 150)
+  const about = await ai({ message: 'What is the ruling on suicide in Islam?' })
+  ok('care: a question ABOUT the topic is answered normally', about.mode === 'llm' && about.provider !== null)
+
+  const ruling = await ai({ message: 'Is it halal to take a mortgage to buy a house?' })
+  ok('note: a ruling question ends with the "ask a scholar" note', /not a fatwa or professional advice/.test(ruling.response) && ruling.response.trimEnd().endsWith('a doctor.'))
+  ok('note: an ordinary question does not', !/not a fatwa or professional advice/.test(normal.response))
+  ok('follow-ups: the answer comes with suggested next questions', Array.isArray(normal.followUps) && normal.followUps.includes('Explain it more simply') && normal.followUps.length <= 3, JSON.stringify(normal.followUps))
+  const withSources = await ai({ message: 'What does the Quran say about patience?' })
+  ok('follow-ups: they are built from the sources found', (withSources.sources?.length ?? 0) > 0 && withSources.followUps.some((f) => /^Explain (Quran|this hadith)/.test(f)), JSON.stringify(withSources.followUps))
+
+  // ask by voice
+  const clip = (bytes, type = 'audio/webm') => { const fd = new FormData(); fd.append('audio', new Blob([new Uint8Array(bytes).fill(7)], { type }), 'q.webm'); fd.append('lang', 'en'); return fd }
+  const voice = async (fd, ip = '203.0.113.61') => fetch(`${APP}/api/transcribe`, { method: 'POST', headers: { 'X-Forwarded-For': ip }, body: fd })
+  const heard = await voice(clip(4000))
+  const heardBody = await heard.json()
+  ok('voice: a short recording comes back as text', heard.status === 200 && typeof heardBody.text === 'string' && heardBody.text.length > 3, JSON.stringify(heardBody))
+  ok('voice: an empty, oversized or non-audio upload is refused', (await voice(clip(0))).status === 400 && (await voice(clip(5 * 1024 * 1024))).status === 413 && (await voice(clip(4000, 'text/html'))).status === 415)
+  ok('voice: it needs a file and the right kind of request', (await voice(new FormData())).status === 400 && (await fetch(`${APP}/api/transcribe`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })).status === 415)
+
+  // 👍 / 👎
+  const fb = (b) => fetch(`${APP}/api/ai/feedback`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': '203.0.113.62' }, body: JSON.stringify(b) })
+  ok('feedback: 👍 and 👎 are accepted, anything else is refused', (await fb({ rating: 'good' })).status === 204 && (await fb({ rating: 'bad' })).status === 204 && (await fb({ rating: 'meh' })).status === 400 && (await fb({})).status === 400)
 }
 
 // 9. The rate limiter protects free quotas from a single heavy visitor

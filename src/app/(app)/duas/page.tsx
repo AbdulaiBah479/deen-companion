@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import DuaFinder from '@/components/DuaFinder'
 
 const CATEGORIES = [
   { id: 'morning-dhikr', label: 'Morning' },
@@ -48,6 +49,7 @@ export default function DuasPage() {
   return (
     <div>
       <h1 className="text-2xl font-black text-[#0F766E] mb-4">Duas & Adhkar</h1>
+      <DuaFinder />
       <div className="flex gap-2 overflow-x-auto pb-2 mb-4">
         {CATEGORIES.map((c) => (
           <button

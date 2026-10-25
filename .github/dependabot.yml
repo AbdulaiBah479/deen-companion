@@ -8,6 +8,17 @@ updates:
     groups:
       minor-and-patch:
         update-types: [minor, patch]
+    # These major versions currently break the project's own tools (checked in October 2026):
+    #  - TypeScript 7: typescript-eslint does not support it yet, so linting fails (TypeScript 6 is used).
+    #  - ESLint 10: eslint-config-next does not load on it yet.
+    # Remove an entry once the tool that blocks it supports the new version.
+    ignore:
+      - dependency-name: typescript
+        update-types: ['version-update:semver-major']
+      - dependency-name: eslint
+        update-types: ['version-update:semver-major']
+      - dependency-name: '@types/node'
+        update-types: ['version-update:semver-major'] # keep in step with the Node version the app runs on (24)
   - package-ecosystem: github-actions
     directory: /
     schedule:

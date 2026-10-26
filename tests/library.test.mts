@@ -11,7 +11,7 @@ const ok = (name: string, cond: boolean, info = '') => {
 
 // ───────── catalogue ─────────
 ok('150+ topics', LIBRARY.length >= 150, String(LIBRARY.length))
-ok('every category has entries', LIBRARY_CATEGORIES.every((c) => LIBRARY.filter((x) => x.cat === c.id).length >= 10))
+ok('every category has entries', LIBRARY_CATEGORIES.every((c) => LIBRARY.filter((x) => x.cat === c.id || x.also === c.id).length >= 10))
 ok('titles are unique (case-insensitive)', new Set(LIBRARY.map((x) => x.title.toLowerCase())).size === LIBRARY.length)
 ok('every title is accepted by the API filter', LIBRARY.every((x) => isSafeTitle(x.title)), LIBRARY.filter((x) => !isSafeTitle(x.title)).map((x) => x.title).join('|'))
 ok('every linked Quran story exists', LIBRARY.every((x) => !x.story || !!getStory(x.story)), LIBRARY.filter((x) => x.story && !getStory(x.story)).map((x) => x.title).join('|'))

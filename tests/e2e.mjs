@@ -809,6 +809,21 @@ t('circle: checking in shows a streak of 1 and the member list', /Streak: 1 day/
 await ev('localStorage.removeItem("deen:circles")')
 
 
+// ============================ Rituals, baraka, women in the library ============================
+await goto('/rituals'); await waitFor('document.querySelectorAll("[data-testid=ritual]").length>=14', 20000)
+t('rituals: 14+ rituals in five groups, with the ones people ask about', /Istikhara/.test(await text()) && /Prayer for rain/.test(await text()) && /Eclipse prayer/.test(await text()) && /Funeral prayer/.test(await text()) && /not a fatwa/i.test(await text()))
+await goto('/rituals#istikhara'); await waitFor('document.querySelector("#istikhara")?.open===true', 15000)
+t('rituals: a link such as /rituals#istikhara opens that ritual with its steps and a listen button', /two voluntary rak/.test(await text()) && /Listen/.test(await text()))
+await ev('document.querySelector("#istikhara [data-testid=hadith-card] button").click()'); await waitFor('/Jabir|Istikhara/.test(document.querySelector("#istikhara [data-testid=hadith-card]")?.innerText||"")', 15000)
+t('rituals: the hadith behind it opens right there, from Sahih al-Bukhari', /Sahih al-Bukhari 1166/.test(await text()))
+await goto('/duas'); await waitFor('/Baraka/.test(document.body.innerText)', 15000)
+await clickText('Baraka'); await waitFor('!!document.querySelector("[data-testid=baraka]")', 15000)
+t('baraka: the Duas page has a Baraka tab with 15+ habits, grouped, with a note that nothing is guaranteed', (await ev('document.querySelectorAll("[data-testid=habit]").length')) >= 15 && /nothing is guaranteed/.test(await text()))
+await goto('/library'); await waitFor('/Women in Islam/.test(document.body.innerText)', 20000)
+await clickText('Women in Islam'); await sleep(500)
+t('library: a Women in Islam shelf lists the mothers of the believers and other great women', /Hafsa/.test(await text()) && /Khadija/.test(await text()) && /Fatima al-Fihri/.test(await text()))
+
+
 // ============================ Verse Journey ============================
 await goto('/journey'); await waitFor('document.querySelectorAll("[data-testid=journey-feelings] li").length>=13', 20000)
 t('journey: the feelings list offers 13 situations', true)

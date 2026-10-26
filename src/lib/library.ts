@@ -1,7 +1,7 @@
 // The Library: a browsable catalogue of Islamic knowledge. Every title is a Wikipedia article (checked to exist), fetched live
 // by the server so the text stays current. Nothing here is copied or stored — see lib/wiki.ts.
 
-export type LibraryCategory = 'prophets' | 'companions' | 'history' | 'places' | 'scholars' | 'beliefs'
+export type LibraryCategory = 'prophets' | 'companions' | 'history' | 'places' | 'scholars' | 'beliefs' | 'women'
 
 export const LIBRARY_CATEGORIES: { id: LibraryCategory; title: string; icon: string; blurb: string }[] = [
   { id: 'prophets', title: 'Prophets', icon: '🕊️', blurb: 'From Adam to Muhammad ﷺ' },
@@ -10,6 +10,7 @@ export const LIBRARY_CATEGORIES: { id: LibraryCategory; title: string; icon: str
   { id: 'places', title: 'Places', icon: '🕌', blurb: 'The holy sites and famous mosques' },
   { id: 'scholars', title: 'Scholars & scientists', icon: '📚', blurb: 'Imams, hadith masters and thinkers' },
   { id: 'beliefs', title: 'Beliefs & practice', icon: '🕯️', blurb: 'Pillars, worship, the unseen and daily life' },
+  { id: 'women', title: 'Women in Islam', icon: '🌸', blurb: 'The mothers of the believers, great women of faith and learning, and what Islam teaches about women' },
 ]
 
 export type LibraryEntry = {
@@ -18,7 +19,10 @@ export type LibraryEntry = {
   cat: LibraryCategory
   honorific?: string // shown after the name, e.g. ﷺ
   story?: string // matching Quran story id in lib/stories.ts
+  also?: LibraryCategory // a second shelf the topic also appears on (for example a companion who is also under Women)
 }
+
+export const inCategory = (x: LibraryEntry, cat: LibraryCategory | 'all') => cat === 'all' || x.cat === cat || x.also === cat
 
 const P = 'عليه السلام'
 const S = 'رضي الله عنه'
@@ -27,6 +31,8 @@ const SF = 'رضي الله عنها'
 const prophet = (title: string, name: string, story?: string, honorific = P): LibraryEntry => ({ title, name, cat: 'prophets', honorific, story })
 const sahabi = (title: string, name: string, honorific = S): LibraryEntry => ({ title, name, cat: 'companions', honorific })
 const e = (cat: LibraryCategory, title: string, name = title, story?: string): LibraryEntry => ({ title, name, cat, story })
+const w = (x: LibraryEntry): LibraryEntry => ({ ...x, also: 'women' })
+const woman = (title: string, name: string, honorific = SF): LibraryEntry => ({ title, name, cat: 'women', honorific })
 
 export const LIBRARY: LibraryEntry[] = [
   // ── Prophets ──
@@ -55,7 +61,7 @@ export const LIBRARY: LibraryEntry[] = [
   prophet('John the Baptist in Islam', 'Yahya (John)', 'zakariya'),
   prophet('Jesus in Islam', 'Isa (Jesus)', 'isa'),
   prophet('Muhammad', 'Muhammad', 'first-revelation', 'ﷺ'),
-  prophet('Mary in Islam', 'Maryam (Mary)', 'maryam', 'عليها السلام'),
+  w(prophet('Mary in Islam', 'Maryam (Mary)', 'maryam', 'عليها السلام')),
   { title: 'Luqman', name: 'Luqman the Wise', cat: 'prophets', story: 'luqman' },
   { title: 'Dhu al-Qarnayn', name: 'Dhul-Qarnayn', cat: 'prophets', story: 'dhulqarnayn' },
   { title: 'Khidr', name: 'Al-Khidr', cat: 'prophets', story: 'musa-khidr' },
@@ -65,11 +71,11 @@ export const LIBRARY: LibraryEntry[] = [
   sahabi('Umar', 'ʿUmar ibn al-Khattab'),
   sahabi('Uthman', 'ʿUthman ibn ʿAffan'),
   sahabi('Ali', 'ʿAli ibn Abi Talib'),
-  sahabi('Khadija bint Khuwaylid', 'Khadija bint Khuwaylid', SF),
-  sahabi('Aisha', 'ʿAisha bint Abi Bakr', SF),
-  sahabi('Fatima', 'Fatima az-Zahra', SF),
-  sahabi('Umm Salama', 'Umm Salama', SF),
-  sahabi('Sumayyah bint Khayyat', 'Sumayya bint Khayyat', SF),
+  w(sahabi('Khadija bint Khuwaylid', 'Khadija bint Khuwaylid', SF)),
+  w(sahabi('Aisha', 'ʿAisha bint Abi Bakr', SF)),
+  w(sahabi('Fatima', 'Fatima az-Zahra', SF)),
+  w(sahabi('Umm Salama', 'Umm Salama', SF)),
+  w(sahabi('Sumayyah bint Khayyat', 'Sumayya bint Khayyat', SF)),
   sahabi('Bilal ibn Rabah', 'Bilal ibn Rabah'),
   sahabi('Hamza ibn Abd al-Muttalib', 'Hamza ibn ʿAbd al-Muttalib'),
   sahabi('Khalid ibn al-Walid', 'Khalid ibn al-Walid'),
@@ -225,7 +231,7 @@ export const LIBRARY: LibraryEntry[] = [
   e('beliefs', 'Jahannam', 'Jahannam'),
   e('beliefs', 'Islamic funeral', 'Janazah (funeral)'),
   e('beliefs', 'Aqiqah', 'ʿAqiqah'),
-  e('beliefs', 'Mahr', 'Mahr'),
+  { ...e('beliefs', 'Mahr', 'Mahr'), also: 'women' },
   e('beliefs', 'Halal', 'Halal'),
   e('beliefs', 'Islamic dietary laws', 'Islamic dietary laws'),
   e('beliefs', 'Riba', 'Riba'),
@@ -233,6 +239,32 @@ export const LIBRARY: LibraryEntry[] = [
   e('beliefs', 'Sunni Islam', 'Sunni Islam'),
   e('beliefs', 'Shia Islam', 'Shia Islam'),
   e('beliefs', 'Ibadi Islam', 'Ibadi Islam'),
+
+  // ── Women in Islam ── (more under Companions: Khadija, ʿAisha, Fatima, Umm Salama, Sumayya; and Maryam under Prophets)
+  e('women', 'Women in Islam', 'Women in Islam'),
+  e('women', 'Women in the Quran', 'Women in the Qur’an'),
+  e('women', 'Wives of Muhammad', 'The wives of the Prophet ﷺ (Mothers of the Believers)'),
+  woman('Hafsa bint Umar', 'Hafsa bint ʿUmar'),
+  woman('Zaynab bint Jahsh', 'Zaynab bint Jahsh'),
+  woman('Juwayriya bint al-Harith', 'Juwayriya bint al-Harith'),
+  woman('Safiyya bint Huyayy', 'Safiyya bint Huyayy'),
+  woman('Maymunah bint al-Harith', 'Maymuna bint al-Harith'),
+  woman('Zainab bint Muhammad', 'Zaynab, daughter of the Prophet ﷺ'),
+  woman('Ruqayya bint Muhammad', 'Ruqayya, daughter of the Prophet ﷺ'),
+  woman('Umm Kulthum bint Muhammad', 'Umm Kulthum, daughter of the Prophet ﷺ'),
+  woman('Umm Ayman', 'Umm Ayman'),
+  woman('Umm Sulaym bint Milhan', 'Umm Sulaym bint Milhan'),
+  woman("Nusaybah bint Ka'ab", 'Nusayba bint Kaʿb (Umm ʿUmara)'),
+  woman('Asma bint Abi Bakr', 'Asma bint Abi Bakr (Dhat an-Nitaqayn)'),
+  woman('Rufaida Al-Aslamia', 'Rufayda al-Aslamiyya (the first nurse)'),
+  woman('Khawla bint al-Azwar', 'Khawla bint al-Azwar'),
+  woman("Al-Khansa'", 'al-Khansaʾ (the poet)'),
+  woman('Zaynab bint Ali', 'Zaynab bint ʿAli'),
+  woman('Rabia Basri', 'Rabiʿa al-ʿAdawiyya', 'رحمها الله'),
+  woman('Fatima al-Fihriya', 'Fatima al-Fihri (founder of al-Qarawiyyin)', 'رحمها الله'),
+  woman('Asiya', 'Asiya, wife of Pharaoh', 'عليها السلام'),
+  woman('Hagar in Islam', 'Hajar (Hagar)', 'عليها السلام'),
+  e('women', 'Hijab', 'Hijab'),
 ]
 
 export const findEntry = (title: string) => LIBRARY.find((x) => x.title.toLowerCase() === title.toLowerCase())

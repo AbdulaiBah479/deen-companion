@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import BarakaHabits from '@/components/BarakaHabits'
 import DuaFinder from '@/components/DuaFinder'
 
 const CATEGORIES = [
@@ -9,6 +10,7 @@ const CATEGORIES = [
   { id: 'dhikr-after-salah', label: 'After Salah' },
   { id: 'daily-dua', label: 'Daily' },
   { id: 'selected-dua', label: 'Selected' },
+  { id: 'baraka', label: '✨ Baraka' },
 ]
 
 type Dua = {
@@ -29,6 +31,10 @@ export default function DuasPage() {
   const [error, setError] = useState('')
 
   useEffect(() => {
+    if (category === 'baraka') {
+      setLoading(false)
+      return
+    }
     let cancelled = false
     setLoading(true)
     setError('')
@@ -64,11 +70,12 @@ export default function DuasPage() {
         ))}
       </div>
 
-      {loading && <p className="text-gray-500">Loading…</p>}
-      {error && <p className="text-red-600">{error}</p>}
+      {category === 'baraka' && <BarakaHabits />}
+      {category !== 'baraka' && loading && <p className="text-gray-500">Loading…</p>}
+      {category !== 'baraka' && error && <p className="text-red-600">{error}</p>}
 
       <ul className="space-y-4">
-        {!loading &&
+        {category !== 'baraka' && !loading &&
           items.map((d, i) => (
             <li key={`${d.title}-${i}`} className="bg-white border border-gray-200 rounded-2xl p-5">
               <h2 className="font-bold mb-3">{d.title}</h2>

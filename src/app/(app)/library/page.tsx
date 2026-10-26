@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
-import { LIBRARY, LIBRARY_CATEGORIES, entryOfTheDay, type LibraryCategory, type LibraryEntry } from '@/lib/library'
+import { LIBRARY, LIBRARY_CATEGORIES, entryOfTheDay, inCategory, type LibraryCategory, type LibraryEntry } from '@/lib/library'
 import { localDateKey, useStored } from '@/lib/storage'
 
 type Hit = { title: string; snippet: string }
@@ -36,7 +36,7 @@ export default function LibraryPage() {
 
   const needle = q.trim().toLowerCase()
   const list = useMemo(
-    () => LIBRARY.filter((x) => (cat === 'all' || x.cat === cat) && (!needle || `${x.name} ${x.title}`.toLowerCase().includes(needle))),
+    () => LIBRARY.filter((x) => inCategory(x, cat as LibraryCategory | 'all') && (!needle || `${x.name} ${x.title}`.toLowerCase().includes(needle))),
     [cat, needle]
   )
 

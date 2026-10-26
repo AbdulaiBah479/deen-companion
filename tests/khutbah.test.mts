@@ -36,6 +36,7 @@ ok('evidence: nonsense input does not crash', Array.isArray(customEvidence('zzqx
 const para = (n: string) => n + ' is explained here in enough words to count as a real paragraph of the talk. [Q1] [Q9]'
 const good = HEADINGS.map((h) => h + '\n' + para(h)).join('\n\n')
 ok('draft: a draft with the five headings is read into five sections', parseDraft(good)?.length === 5 && parseDraft(good)?.[2].heading === 'Second point')
+ok('draft: a heading repeated inside its own text is removed', parseDraft(good.replace('First point', 'First point' + String.fromCharCode(10) + 'First point'))?.[1].body.split(String.fromCharCode(10)).every((l) => l.trim() !== 'First point'))
 ok('draft: headings may carry markdown marks and still be found', parseDraft(good.replace('First point\n', '## **First point**\n'))?.length === 5)
 ok('draft: a missing heading means the draft is refused', parseDraft(good.replace('Third point\n', 'Something else\n')) === null)
 ok('draft: an empty section means the draft is refused', parseDraft(good.replace(para('Introduction'), 'Hi')) === null)

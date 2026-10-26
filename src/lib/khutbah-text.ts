@@ -17,11 +17,17 @@ export function parseDraft(text: string): Section[] | null {
     if (start < 0) return null
     const after = text.slice(start).replace(/^[^\n]*\n/, '')
     const next = HEADINGS.slice(i + 1).map((h) => after.search(headingRe(h))).filter((n) => n >= 0)
-    const body = (next.length ? after.slice(0, Math.min(...next)) : after).replace(/[*#_]/g, '').trim()
+    const body = dropHeading((next.length ? after.slice(0, Math.min(...next)) : after).replace(/[*#_]/g, '').trim(), HEADINGS[i])
     if (body.length < 40) return null
     out.push({ heading: HEADINGS[i], body })
   }
   return out
+}
+
+// Some models repeat the heading as the first line of its own text; that line is removed.
+export function dropHeading(body: string, heading: string): string {
+  const same = (l: string) => l.replace(/[^a-z ]/gi, '').trim().toLowerCase() === heading.toLowerCase()
+  return body.split('\n').filter((l) => !same(l)).join('\n').trim()
 }
 
 // A draft may only point at evidence that exists: [Q7] when there is no Q7 is removed.

@@ -23,7 +23,9 @@ function parseSections(text: string): { title: string; body: string }[] | null {
     if (start < 0) return null
     const after = text.slice(start).replace(/^[^\n]*\n/, '')
     const next = HEADINGS.slice(i + 1).map((h) => after.search(headingRe(h))).filter((n) => n >= 0)
-    const body = (next.length ? after.slice(0, Math.min(...next)) : after).replace(/[*_#]/g, '').trim()
+    // Some models repeat the heading as the first line of their text; any line that is only the heading is dropped.
+    const same = (l: string) => l.replace(/[^a-z ]/gi, '').trim().toLowerCase() === HEADINGS[i].toLowerCase()
+    const body = (next.length ? after.slice(0, Math.min(...next)) : after).replace(/[*_#]/g, '').split('\n').filter((l) => !same(l)).join('\n').trim()
     if (body.length < 20) return null
     out.push({ title: HEADINGS[i], body })
   }

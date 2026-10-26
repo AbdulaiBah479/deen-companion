@@ -4,8 +4,9 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { errorMessage, getPosition, placeInfo, readSaved } from '@/lib/location'
 import { methodForCountry } from '@/lib/prayer-calc'
 import { PRAYER_NAMES } from '@/lib/prayer'
-import { minutesNowIn } from '@/lib/prayer-calc'
+import { countdown, nextPrayerIn, secondsNowIn } from '@/lib/adhan'
 import { loadPrayerTimes } from '@/lib/prayer-source'
+import PrayerAlarms from '@/components/PrayerAlarms'
 import PushReminders from '@/components/PushReminders'
 import type { Place } from '@/lib/use-prayer-times'
 import { localDateKey, useStored } from '@/lib/storage'
@@ -38,22 +39,12 @@ const METHODS: [number, string][] = [
 ]
 
 const clean = (t: string) => t.split(' ')[0]
-const minutesOf = (t: string) => {
-  const [h, m] = clean(t).split(':').map(Number)
-  return h * 60 + m
-}
-
-function nextPrayer(times: Times, timeZone?: string): (typeof ORDER)[number] {
-  const mins = minutesNowIn(timeZone)
-  return ORDER.find((p) => minutesOf(times[p]) > mins) ?? 'fajr'
-}
 
 export default function PrayerPage() {
   const [place, setPlace, placeReady] = useStored<Place>('deen:place', { kind: 'city', city: 'London', country: 'UK' })
   const [, setAuto] = useStored<boolean | null>('deen:place-auto', null)
   const [method, setMethod] = useStored<number>('deen:method', 2)
   const [, setMethodChosen] = useStored<boolean>('deen:method-chosen', false)
-  const [notify, setNotify] = useStored<boolean>('deen:notify', false)
   const [city, setCity] = useState('London')
   const [country, setCountry] = useState('UK')
   const [times, setTimes] = useState<Times | null>(null)
@@ -61,8 +52,7 @@ export default function PrayerPage() {
   const [loading, setLoading] = useState(false)
   const [log, setLog] = useStored<Record<string, Record<string, boolean>>>('deen:prayers', {})
   const [today, setToday] = useState('')
-  const [notifyMsg, setNotifyMsg] = useState('')
-  const timers = useRef<number[]>([])
+  const [nowSec, setNowSec] = useState<number | null>(null)
 
   const load = useCallback(async (p: Place, m: number) => {
     setLoading(true)
@@ -149,37 +139,29 @@ export default function PrayerPage() {
     setLog((l) => ({ ...l, [today]: { ...(l[today] ?? {}), [p]: !(l[today] ?? {})[p] } }))
   }
 
-  // Reminders: schedule a notification for each remaining prayer today. Works while the app/tab is open.
+  // A clock that ticks every second (for the countdown), and a new day loads the new day's times.
+  const tz = place.kind === 'city' ? place.geo?.tz : undefined
+  const dayKey = useCallback(() => new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(new Date()), [tz])
+  const shownDay = useRef('')
   useEffect(() => {
-    timers.current.forEach((t) => window.clearTimeout(t))
-    timers.current = []
-    if (!notify || !times || typeof Notification === 'undefined' || Notification.permission !== 'granted') return
-    const now = new Date()
-    for (const p of ORDER) {
-      const [h, m] = clean(times[p]).split(':').map(Number)
-      const at = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m, 0).getTime()
-      const delay = at - Date.now()
-      if (delay > 0 && delay < 24 * 3600_000) {
-        timers.current.push(
-          window.setTimeout(() => {
-            new Notification(`${PRAYER_NAMES[p].en} — time to pray`, { body: `${PRAYER_NAMES[p].ar} · ${clean(times[p])}`, icon: '/icon.svg' })
-          }, delay)
-        )
+    if (!placeReady) return
+    shownDay.current = dayKey()
+    const id = window.setInterval(() => {
+      setNowSec(secondsNowIn(tz))
+      const k = dayKey()
+      if (shownDay.current && k !== shownDay.current) {
+        shownDay.current = k
+        setToday(localDateKey(new Date()))
+        load(place, method)
       }
-    }
-    return () => timers.current.forEach((t) => window.clearTimeout(t))
-  }, [notify, times])
+    }, 1000)
+    setNowSec(secondsNowIn(tz))
+    return () => window.clearInterval(id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [placeReady, tz, place, method])
 
-  async function toggleNotify(on: boolean) {
-    setNotifyMsg('')
-    if (!on) return setNotify(false)
-    if (typeof Notification === 'undefined') return setNotifyMsg('Notifications are not supported in this browser.')
-    const perm = Notification.permission === 'granted' ? 'granted' : await Notification.requestPermission()
-    if (perm === 'granted') setNotify(true)
-    else setNotifyMsg('Notification permission was not granted.')
-  }
-
-  const upcoming = times ? nextPrayer(times, place.kind === 'city' ? place.geo?.tz : undefined) : null
+  const next = times && nowSec !== null ? nextPrayerIn(times, nowSec) : null
+  const upcoming = next?.prayer ?? null
   const count = ORDER.filter((p) => done[p]).length
 
   return (
@@ -242,16 +224,15 @@ export default function PrayerPage() {
             <div className="text-3xl font-black">
               {upcoming && PRAYER_NAMES[upcoming].en} <span className="text-[#E6C86A]">{upcoming && clean(times[upcoming])}</span>
             </div>
+            {next && (
+              <div className="text-lg font-bold mt-1 tabular-nums" data-testid="prayer-countdown" aria-label="Time until the next prayer">
+                in {countdown(next.inSeconds)}{next.tomorrow ? ' (tomorrow, approximately)' : ''}
+              </div>
+            )}
             <div className="text-sm opacity-80 mt-1">Sunrise {clean(times.sunrise)}</div>
           </div>
 
-          <label className="flex items-center gap-2 text-sm mb-1">
-            <input type="checkbox" checked={notify} onChange={(e) => toggleNotify(e.target.checked)} />
-            Remind me at prayer times
-          </label>
-          <p className="text-xs text-gray-500 mb-3">
-            Reminders work while Deen Companion is open in your browser or installed app. {notifyMsg && <span className="text-red-600">{notifyMsg}</span>}
-          </p>
+          <PrayerAlarms times={times} timeZone={tz} />
 
           <PushReminders place={place} method={method} />
 

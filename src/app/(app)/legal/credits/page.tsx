@@ -13,6 +13,8 @@ const rows: [string, string, string][] = [
   ['Lecture videos', 'YouTube channels chosen by the operator', 'Played from YouTube’s privacy-enhanced player; the videos belong to their creators.'],
   ['Metal prices and currency rates (Zakat)', 'gold-api.com, open.er-api.com', 'Free public APIs; indicative prices only.'],
   ['AI answers', 'Free tiers of Google Gemini, Groq, Mistral, GitHub Models, SambaNova, NVIDIA, Hugging Face, OpenRouter and others the operator enables', 'Answers are generated from the Quran and hadith passages shown beside them. They can be wrong.'],
+  ['Adhan recordings', 'Aaqib Azeez (CC BY-SA 4.0), Andrewler (CC BY-SA 4.0) and Adam-synagda (CC0), from Wikimedia Commons', 'Recordings are used under their licences; the two CC BY-SA recordings stay under CC BY-SA 4.0. Source pages are linked in the Prayer page.'],
+  ['Books: English translations', 'Project Gutenberg (public domain)', 'Translators are named on each book. Arabic originals: Arabic Wikisource volunteers, CC BY-SA 4.0, with a link to the source on every page.'],
   ['Stories of the Quran, Great Muslims, quizzes, games, guides', 'Written for this app', 'Short summaries for learning; dates as commonly cited. Not a substitute for scholarly review.'],
 ]
 

@@ -3,8 +3,8 @@
 //  • pages and API calls: network-first, then whatever was saved last time
 //  • a page you never opened while online: a friendly /offline page instead of the browser's error
 // The Quran can be saved on purpose from Settings → Offline (see src/lib/offline.ts), which writes into the same cache.
-const CACHE = 'deen-v2'
-const SHELL = ['/offline', '/dashboard', '/quran', '/prayer', '/dhikr', '/more', '/icon.svg', '/icon-192.png']
+const CACHE = 'deen-v3'
+const SHELL = ['/offline', '/dashboard', '/quran', '/prayer', '/dhikr', '/more', '/duas', '/hadith', '/tafsir', '/journey', '/books', '/guides', '/icon.svg', '/icon-192.png']
 
 // Never keep these on a device: the owner's control room, the scheduler, reports, reminder sign-ups, accounts and AI questions.
 // (They can contain account e-mails or personal text, and a saved copy would outlive signing out.)
@@ -58,7 +58,8 @@ self.addEventListener('fetch', (event) => {
   const req = event.request
   if (req.method !== 'GET') return
   const url = new URL(req.url)
-  if (/\.mp3$/.test(url.pathname)) {
+  // Recitation, and the adhan recordings once the app has saved the one you chose (so the adhan works offline).
+  if (/\.mp3$/.test(url.pathname) || url.pathname.startsWith('/adhan/')) {
     event.respondWith(savedAudio(req))
     return
   }

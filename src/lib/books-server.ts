@@ -65,3 +65,10 @@ export async function bookPage(id: string, lang: BookLang, page: number): Promis
   const p = Math.min(Math.max(1, Math.floor(page) || 1), book.pages.length)
   return { id, lang, page: p, pages: book.pages.length, paragraphs: book.pages[p - 1], source: book.source }
 }
+
+// Every paragraph of a book with its place (page and paragraph number), for searching inside the book.
+export async function bookParagraphs(id: string, lang: BookLang): Promise<{ page: number; para: number; text: string }[] | null> {
+  const book = await load(id, lang)
+  if (!book) return null
+  return book.pages.flatMap((paras, p) => paras.map((text, i) => ({ page: p + 1, para: i, text })))
+}

@@ -206,6 +206,7 @@ http
           if (cmd === 'SCARD') return { result: (redis.sets.get(key) ?? new Set()).size }
           if (cmd === 'HINCRBY') { const h = redis.hashes.get(key) ?? new Map(); h.set(String(args[0]), String(Number(h.get(String(args[0])) ?? 0) + Number(args[1]))); redis.hashes.set(key, h); return { result: Number(h.get(String(args[0]))) } }
           if (cmd === 'HSET') { const h = redis.hashes.get(key) ?? new Map(); for (let i = 0; i + 1 < args.length; i += 2) h.set(String(args[i]), String(args[i + 1])); redis.hashes.set(key, h); return { result: 1 } }
+          if (cmd === 'HDEL') { const h = redis.hashes.get(key); let n = 0; for (const f of args) if (h?.delete(String(f))) n++; return { result: n } }
           if (cmd === 'HLEN') return { result: (redis.hashes.get(key) ?? new Map()).size }
           if (cmd === 'HEXISTS') return { result: (redis.hashes.get(key) ?? new Map()).has(String(args[0])) ? 1 : 0 }
           if (cmd === 'HGET') return { result: redis.hashes.get(key)?.get(String(args[0])) ?? null }

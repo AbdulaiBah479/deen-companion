@@ -21,6 +21,8 @@ export default function BookReader({ id }: { id: string }) {
   const [data, setData] = useState<PageData | null | undefined>(undefined)
   const [aids, setAids] = useState<Record<string, Aid>>({})
   const [jump, setJump] = useState('')
+  const [question, setQuestion] = useState('')
+  const [asked, setAsked] = useState<{ state: 'loading' } | { state: 'error'; message: string } | { state: 'done'; answer: string | null; note?: string; excerpts: { page: number; para: number; text: string }[] } | null>(null)
 
   // The place is restored once, when the book or language changes.
   useEffect(() => {
@@ -68,6 +70,20 @@ export default function BookReader({ id }: { id: string }) {
     }
   }
 
+  async function askBook(e: React.FormEvent) {
+    e.preventDefault()
+    if (question.trim().length < 3) return
+    setAsked({ state: 'loading' })
+    try {
+      const r = await fetch('/api/books/ask', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, lang, question, to: appLang }) })
+      const d = await r.json()
+      if (!r.ok) throw new Error(d.error || 'Failed')
+      setAsked({ state: 'done', answer: d.answer, note: d.note, excerpts: d.excerpts ?? [] })
+    } catch (err) {
+      setAsked({ state: 'error', message: err instanceof Error ? err.message : 'Failed' })
+    }
+  }
+
   if (!book) {
     return (
       <p className="text-gray-600">
@@ -102,6 +118,33 @@ export default function BookReader({ id }: { id: string }) {
       )}
       {!book.english && <p className="text-xs text-gray-500">This book is available here in the Arabic original. Use “Translate (AI)” on any paragraph for an English translation.</p>}
       {!book.arabic && <p className="text-xs text-gray-500">This book is available here in English only; the original is not on the shelf.</p>}
+
+      <section className="rounded-2xl border border-gray-200 bg-white p-3" aria-label="Ask this book" data-testid="ask-book">
+        <form onSubmit={askBook} className="flex gap-2">
+          <input value={question} onChange={(e) => setQuestion(e.target.value.slice(0, 300))} placeholder="Ask this book a question…" aria-label="Ask this book a question" className="flex-1 min-w-0 px-3 py-2 rounded-lg border border-gray-300 text-sm" />
+          <button disabled={asked?.state === 'loading' || question.trim().length < 3} className="px-4 py-2 rounded-lg bg-[#0F766E] text-white text-sm font-semibold disabled:opacity-50">Ask</button>
+        </form>
+        {asked?.state === 'loading' && <p className="text-sm text-gray-500 mt-2">Searching the book…</p>}
+        {asked?.state === 'error' && <p className="text-sm text-red-700 mt-2" role="alert">{asked.message}</p>}
+        {asked?.state === 'done' && (
+          <div className="mt-3 space-y-2" dir="ltr">
+            {asked.answer ? (
+              <div className="rounded-lg bg-amber-50 border border-amber-200 p-2 text-sm">
+                <p className="text-xs font-bold text-amber-800">Answer written by AI from the passages below only — it can make mistakes</p>
+                <p className="mt-1 whitespace-pre-line text-gray-800" data-testid="ask-answer">{asked.answer}</p>
+              </div>
+            ) : (
+              <p className="text-sm text-gray-700">{asked.note}</p>
+            )}
+            {asked.excerpts.map((x, i) => (
+              <blockquote key={i} className="border-l-4 border-[#0F766E] pl-3 text-sm text-gray-700">
+                <p dir={lang === 'ar' ? 'rtl' : 'ltr'} lang={lang} className={lang === 'ar' ? 'font-arabic text-lg leading-loose' : ''}>[{i + 1}] {x.text}</p>
+                <button type="button" onClick={() => go(x.page)} className="text-xs underline text-[#0F766E] mt-1">Open page {x.page}</button>
+              </blockquote>
+            ))}
+          </div>
+        )}
+      </section>
 
       {data === undefined && <p className="text-gray-500">Loading the page…</p>}
       {data === null && <p className="text-gray-700 rounded-xl border border-gray-200 bg-white p-4">The book could not be loaded right now. Please try again in a little while.</p>}

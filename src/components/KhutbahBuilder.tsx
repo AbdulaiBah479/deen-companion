@@ -57,6 +57,24 @@ export default function KhutbahBuilder() {
   const [prompter, setPrompter] = useState(false)
   const [size, setSize] = useState(32)
   const [copied, setCopied] = useState(false)
+  // Mosque mode: a stopwatch against the planned length, and the screen stays on while reading.
+  const [secs, setSecs] = useState(0)
+  const [running, setRunning] = useState(false)
+  useEffect(() => {
+    if (!prompter || !running) return
+    const t = setInterval(() => setSecs((x) => x + 1), 1000)
+    return () => clearInterval(t)
+  }, [prompter, running])
+  useEffect(() => {
+    if (!prompter) return
+    let lock: { release: () => Promise<void> } | null = null
+    const nav = navigator as Navigator & { wakeLock?: { request: (t: 'screen') => Promise<{ release: () => Promise<void> }> } }
+    nav.wakeLock?.request('screen').then((l) => (lock = l)).catch(() => {})
+    return () => {
+      lock?.release().catch(() => {})
+    }
+  }, [prompter])
+  const jumpTo = (i: number) => document.getElementById('khutbah-part-' + i)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 
   // The topic that suits today's date (an occasion that is near, otherwise one that changes every week).
   const [suggested, setSuggested] = useState<string | null>(null)
@@ -121,11 +139,23 @@ export default function KhutbahBuilder() {
           <button onClick={() => setPrompter(false)} className="px-3 py-1.5 rounded-lg bg-white text-black text-sm font-semibold">✕ Close</button>
           <button onClick={() => setSize((s) => Math.max(20, s - 4))} className="px-3 py-1.5 rounded-lg border border-white/40 text-sm" aria-label="Smaller text">A−</button>
           <button onClick={() => setSize((s) => Math.min(72, s + 4))} className="px-3 py-1.5 rounded-lg border border-white/40 text-sm" aria-label="Bigger text">A+</button>
+          <button onClick={() => setRunning((r) => !r)} className="px-3 py-1.5 rounded-lg border border-white/40 text-sm tabular-nums" aria-label={running ? 'Pause the timer' : 'Start the timer'} data-testid="khutbah-timer">
+            {running ? '⏸' : '▶'} {Math.floor(secs / 60)}:{String(secs % 60).padStart(2, '0')} / {sermon.minutes}:00
+          </button>
+          {secs > 0 && <button onClick={() => { setSecs(0); setRunning(false) }} className="px-2 py-1.5 text-xs text-white/70 underline">Reset</button>}
+          <span className={`text-xs font-bold ${secs > sermon.minutes * 60 ? 'text-red-400' : secs > sermon.minutes * 54 ? 'text-amber-300' : 'text-teal-300'}`}>
+            {secs === 0 ? '' : secs > sermon.minutes * 60 ? 'Over time' : secs > sermon.minutes * 54 ? 'Time to conclude' : 'On time'}
+          </span>
+        </div>
+        <div className="flex gap-1 overflow-x-auto pb-2" aria-label="Jump to a part">
+          {parts.map((p, i) => (p.label.startsWith('Verse ') || p.label === 'Then' || p.label === 'End' ? null : (
+            <button key={i} onClick={() => jumpTo(i)} className="shrink-0 px-2 py-1 rounded-full border border-white/30 text-xs">{p.label.replace(/ — .*/, '').replace('Sit briefly between the two sermons', 'Sit').replace('Blessings on the Prophet ﷺ', 'Salawat').replace('Closing verse ', 'Closing ')}</button>
+          )))}
         </div>
         <div style={{ fontSize: size }} className="leading-relaxed max-w-3xl mx-auto pb-24">
           <h1 className="font-black mb-6">{sermon.title}</h1>
           {parts.map((p, i) => (
-            <div key={i} className="mb-6">
+            <div key={i} id={'khutbah-part-' + i} className="mb-6">
               <p className="text-teal-300 text-[0.5em] font-bold uppercase tracking-wide">{p.label}</p>
               {p.arabic && <p dir="rtl" lang="ar" className="font-arabic leading-[2] mt-1">{p.arabic}</p>}
               {p.text && <p className="mt-1 whitespace-pre-line">{p.text}</p>}

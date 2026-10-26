@@ -63,6 +63,11 @@ export default function PrivacyPage() {
           Do not type personal details into a sermon topic.
         </li>
         <li>
+          <strong>Family circles.</strong> If you create or join a circle, the circle’s name, the name you type, and the days you checked in are stored on our server (in
+          the shared database) so the other members can see them. Your device is recognised only by a random code kept on your phone, stored on the server as a one-way hash.
+          Circles that nobody uses for four months are deleted, and you can leave a circle at any time, which removes your entries. Anyone who has a circle’s code can join it.
+        </li>
+        <li>
           <strong>Your IP address.</strong> Our server uses it briefly to limit abuse (for example “no more than 15 AI questions a minute”). That counter expires
           within a minute. The hosting provider keeps ordinary server logs.
         </li>

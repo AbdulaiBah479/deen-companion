@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
+import { InstallCard } from '@/components/InstallApp'
 import LangSelect from '@/components/LangSelect'
 import OfflineAudioManager from '@/components/OfflineAudioManager'
 import OfflineManager from '@/components/OfflineManager'
@@ -120,6 +121,7 @@ export default function SettingsPage() {
   return (
     <div>
       <h1 className="text-2xl font-black text-[#0F766E] mb-4">Settings</h1>
+      <div className="mb-4"><InstallCard /></div>
 
       <section className={section}>
         <h2 className="font-bold mb-3">Language</h2>

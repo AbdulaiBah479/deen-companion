@@ -32,7 +32,11 @@ const TILES = [
   { href: '/recite', icon: '🎤', title: 'Recite', desc: 'Get live feedback' },
   { href: '/goals', icon: '📅', title: 'Khatam planner', desc: 'Finish the Quran' },
   { href: '/prayer', icon: '🕌', title: 'Prayer times', desc: 'Tracker & reminders' },
+  { href: '/journey', icon: '🌿', title: 'Verse Journey', desc: 'A quiet moment for your heart' },
+  { href: '/tafsir', icon: '📖', title: 'Tafsir study', desc: 'Understand any verse' },
   { href: '/hadith', icon: '📚', title: 'Hadith', desc: 'Nine collections' },
+  { href: '/books', icon: '📕', title: 'Islamic books', desc: 'Arabic & English, with audio' },
+  { href: '/khutbah', icon: '🎙️', title: 'Sermons', desc: 'Friday & occasion khutbahs' },
   { href: '/calendar', icon: '🗓', title: 'Calendar', desc: 'Hijri & occasions' },
   { href: '/more', icon: '✨', title: 'More', desc: 'Hifz, duas, quiz…' },
 ]

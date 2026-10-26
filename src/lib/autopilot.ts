@@ -107,6 +107,31 @@ export async function runChecks(): Promise<Check[]> {
 
   if (external)
     checks.push(
+    timed('tafsir-api', 'Tafsir source (Quran.Foundation)', false, async () => {
+      const t0 = Date.now()
+      const r = await fetchOk('https://api.quran.com/api/v4/tafsirs/169/by_ayah/1:1')
+      if (!r.ok) return { status: 'degraded', detail: `HTTP ${r.status} — verse explanations and tafsir pages will be empty` }
+      return { status: slowIs(Date.now() - t0, 5000), detail: 'reachable' }
+    })
+  )
+
+  if (external)
+    checks.push(
+    timed('books', 'Book sources (Gutenberg, Arabic Wikisource)', false, async () => {
+      const t0 = Date.now()
+      const [g, w] = await Promise.allSettled([
+        fetchOk('https://www.gutenberg.org/cache/epub/58977/pg58977.txt', { method: 'HEAD' }, 10_000),
+        fetchOk('https://ar.wikisource.org/w/api.php?action=query&meta=siteinfo&format=json', {}, 10_000),
+      ])
+      const up = [g, w].filter((x) => x.status === 'fulfilled' && x.value.ok).length
+      if (up === 0) return { status: 'down', detail: 'neither source answered — books cannot load' }
+      if (up === 1) return { status: 'degraded', detail: g.status === 'fulfilled' && g.value.ok ? 'Arabic Wikisource is not answering (English books work)' : 'Project Gutenberg is not answering (Arabic books work)' }
+      return { status: slowIs(Date.now() - t0, 6000), detail: 'both reachable' }
+    })
+  )
+
+  if (external)
+    checks.push(
     timed('prayer-api', 'Prayer-times service (AlAdhan)', false, async () => {
       const t0 = Date.now()
       const r = await fetchOk('https://api.aladhan.com/v1/timingsByCity?city=London&country=UK&method=2')

@@ -10,7 +10,8 @@
 import { createHash } from 'node:crypto'
 import webpush from 'web-push'
 import { computeTimes, localDay, minutesNowIn } from './prayer-calc'
-import { toHijri } from './hijri'
+import { toHijri, addDays } from './hijri'
+import { suggestTopic, topicById } from './khutbah'
 import { redis, redisConfigured } from './redis'
 
 import { EXTRA_IDS, LEADS, PRAYERS, type ExtraKey, type PrayerKey } from './push-shared'
@@ -127,7 +128,11 @@ export function dueExtras(r: Pick<Reminder, 'lat' | 'lng' | 'tz' | 'method'> & {
     if (e === 'adhkar-morning') ok = hit(at(times.fajr, 30))
     else if (e === 'adhkar-evening') ok = hit(at(times.asr, 30))
     else if (e === 'kahf') ok = weekday === 5 && hit(at(times.sunrise, 30))
-    else if (e === 'fast-mon-thu') {
+    else if (e === 'khutbah-topic') {
+      ok = weekday === 4 && hit(at(times.maghrib, 30))
+      const fri = addDays(day, 1)
+      detail = suggestTopic(toHijri(fri), Math.floor(fri.getTime() / (7 * 86400_000)))
+    } else if (e === 'fast-mon-thu') {
       ok = (weekday === 0 || weekday === 3) && hit(at(times.maghrib, 30))
       detail = WEEKDAY[(weekday + 1) % 7]
     } else if (e === 'fast-white') {
@@ -147,6 +152,8 @@ export function extraMessage(e: ExtraKey, detail = '') {
       return { title: 'Evening adhkar 🌇', body: 'A few minutes of remembrance before the night.', url: '/duas', tag: 'sunnah-adhkar-evening' }
     case 'kahf':
       return { title: 'Jumu‘ah mubarak 🕌', body: 'A Friday sunnah: read Surat al-Kahf today.', url: '/quran/18', tag: 'sunnah-kahf' }
+    case 'khutbah-topic':
+      return { title: 'Tomorrow is Jumu‘ah 🎙️', body: `A suggested sermon topic: ${topicById(detail)?.title ?? 'Taqwa'}.`, url: `/khutbah?topic=${encodeURIComponent(detail)}`, tag: 'sunnah-khutbah' }
     case 'fast-mon-thu':
       return { title: 'Fasting tomorrow?', body: `Tomorrow is ${detail} — a day the Prophet ﷺ often fasted.`, url: '/prayer', tag: 'sunnah-fast' }
     case 'fast-white':

@@ -8,6 +8,7 @@ export const EXTRAS = [
   { id: 'adhkar-morning', label: 'Morning adhkar (after Fajr)' },
   { id: 'adhkar-evening', label: 'Evening adhkar (after Asr)' },
   { id: 'kahf', label: 'Friday: Surat al-Kahf' },
+  { id: 'khutbah-topic', label: 'Thursday evening: a suggested topic for tomorrow’s Friday sermon' },
   { id: 'fast-mon-thu', label: 'Fasting Monday & Thursday (evening before)' },
   { id: 'fast-white', label: 'White days — 13th, 14th, 15th (evening before)' },
 ] as const

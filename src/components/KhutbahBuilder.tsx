@@ -81,6 +81,12 @@ export default function KhutbahBuilder() {
   useEffect(() => {
     const now = new Date()
     setSuggested(suggestTopic(toHijri(now), Math.floor(now.getTime() / (7 * 86400_000))))
+    // A reminder can open this page already pointing at a topic (?topic=patience).
+    const asked = topicById(new URLSearchParams(location.search).get('topic') ?? '')
+    if (asked) {
+      setMode(asked.kind)
+      setTopicId(asked.id)
+    }
   }, [])
   const suggestedTopic = suggested ? topicById(suggested) : undefined
   const topics = TOPICS.filter((t) => t.kind === mode)

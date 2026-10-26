@@ -1,0 +1,20 @@
+name: Content check
+
+# Once a week: are the free book sources the app reads from (Project Gutenberg, Arabic Wikisource) still there? If one moved or was
+# renamed, THIS JOB FAILS and GitHub emails you, instead of a book quietly showing "could not be loaded".
+on:
+  schedule:
+    - cron: '17 6 * * 1'
+  workflow_dispatch:
+
+jobs:
+  books:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Check the book sources
+        run: node --experimental-strip-types --no-warnings scripts/check-books.mjs

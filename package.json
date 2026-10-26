@@ -59,7 +59,8 @@
     "test:khutbah": "node --import ./tests/register-ts.mjs --experimental-strip-types --no-warnings tests/khutbah.test.mts",
     "test:books": "node --import ./tests/register-ts.mjs --experimental-strip-types --no-warnings tests/books.test.mts",
     "test:adhan": "node --import ./tests/register-ts.mjs --experimental-strip-types --no-warnings tests/adhan.test.mts",
-    "test:circle": "node --import ./tests/register-ts.mjs --experimental-strip-types --no-warnings tests/circle.test.mts"
+    "test:circle": "node --import ./tests/register-ts.mjs --experimental-strip-types --no-warnings tests/circle.test.mts",
+    "check:books": "node --experimental-strip-types --no-warnings scripts/check-books.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",

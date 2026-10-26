@@ -28,6 +28,8 @@ const LABELS: Record<string, string> = {
   redis: 'Shared store (Redis)',
   ai: 'AI companion',
   'hadith-cdn': 'Hadith source',
+  'tafsir-api': 'Tafsir source',
+  books: 'Book sources',
   'prayer-api': 'Prayer-times service',
   audio: 'Recitation audio',
   maps: 'Mosque map services',

@@ -77,6 +77,8 @@ ok('adhkar come once a day: morning after Fajr, evening after Asr', hits(['adhka
 ok('Surat al-Kahf is Friday only (20 Mar 2026 is a Friday)', hits(['kahf'], 20).length === 1 && hits(['kahf'], 21).length === 0 && hits(['kahf'], 19).length === 0)
 ok('Monday/Thursday fasting is announced the evening before (Sun 22, Wed 25 Mar)', hits(['fast-mon-thu'], 22).length === 1 && hits(['fast-mon-thu'], 25).length === 1 && hits(['fast-mon-thu'], 23).length === 0 && hits(['fast-mon-thu'], 21).length === 0)
 ok('the tomorrow named in the fasting message is right', dueExtras(xr(['fast-mon-thu']), new Date(Date.UTC(2026, 2, 22, 16, 0)), 1440).map((d) => d.message.body).join().includes('Monday'))
+ok('Thursday evening brings a suggested sermon topic, only on Thursdays (19 Mar 2026), naming a real topic', hits(['khutbah-topic'], 19).length === 1 && hits(['khutbah-topic'], 20).length === 0 && hits(['khutbah-topic'], 18).length === 0 && hits(['khutbah-topic'], 21).length === 0)
+ok('…and its message names the topic and opens the sermon page on it', (() => { const d = dueExtras(xr(['khutbah-topic']), new Date(Date.UTC(2026, 2, 19, 17, 0)), 1440)[0]; return !!d && /Jumu/.test(d.message.title) && /suggested sermon topic: .{4,}/.test(d.message.body) && d.message.url.startsWith('/khutbah?topic=') })())
 let white = 0
 for (let day = 25; day <= 41; day++) white += hits(['fast-white'], day, 2).length // 25 March–10 April 2026 holds one Hijri month's 12th–14th
 ok('white-days reminder fires on exactly three evenings a Hijri month', white === 3, String(white))

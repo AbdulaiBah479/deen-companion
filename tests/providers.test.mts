@@ -3,7 +3,7 @@
 import http from 'node:http'
 import { AnswerCache, questionKey } from '../src/lib/answer-cache.ts'
 import { ProviderChain } from '../src/lib/ai-chain.ts'
-import { askAI, configuredProviders, ollamaConfig } from '../src/lib/ai.ts'
+import { askAI, configuredProviders, ollamaConfig, omnirouteConfig } from '../src/lib/ai.ts'
 import { dataAvailable } from '../src/lib/data.ts'
 
 let fails = 0
@@ -11,7 +11,7 @@ const ok = (name: string, cond: boolean, info = '') => {
   console.log((cond ? 'PASS ' : 'FAIL ') + name + (info ? '  ' + info : ''))
   if (!cond) fails++
 }
-const KEYS = ['GEMINI_API_KEY', 'GEMINI_MODEL', 'GROQ_API_KEY', 'GROQ_MODEL', 'MISTRAL_API_KEY', 'MISTRAL_MODEL', 'CEREBRAS_API_KEY', 'CEREBRAS_MODEL', 'GITHUB_MODELS_TOKEN', 'SAMBANOVA_API_KEY', 'NVIDIA_API_KEY', 'HF_TOKEN', 'POLLINATIONS', 'POLLINATIONS_MODEL', 'OPENROUTER_API_KEY', 'OPENROUTER_MODEL', 'CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_AI_KEY', 'CUSTOM_AI_BASE_URL', 'OLLAMA_MODEL', 'OLLAMA_BASE_URL', 'OLLAMA_API_KEY', 'OLLAMA_FIRST', 'AI_COMPAT_BASE_OVERRIDE', 'AI_DAILY_CALLS']
+const KEYS = ['GEMINI_API_KEY', 'GEMINI_MODEL', 'GROQ_API_KEY', 'GROQ_MODEL', 'MISTRAL_API_KEY', 'MISTRAL_MODEL', 'CEREBRAS_API_KEY', 'CEREBRAS_MODEL', 'GITHUB_MODELS_TOKEN', 'SAMBANOVA_API_KEY', 'NVIDIA_API_KEY', 'HF_TOKEN', 'POLLINATIONS', 'POLLINATIONS_MODEL', 'OPENROUTER_API_KEY', 'OPENROUTER_MODEL', 'CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_AI_KEY', 'CUSTOM_AI_BASE_URL', 'OMNIROUTE_BASE_URL', 'OMNIROUTE_API_KEY', 'OMNIROUTE_MODEL', 'OLLAMA_MODEL', 'OLLAMA_BASE_URL', 'OLLAMA_API_KEY', 'OLLAMA_FIRST', 'AI_COMPAT_BASE_OVERRIDE', 'AI_DAILY_CALLS']
 const reset = () => KEYS.forEach((k) => delete process.env[k])
 const names = () => configuredProviders().map((p) => p.name)
 
@@ -74,6 +74,16 @@ process.env.GROQ_API_KEY = 'g'
 ok('ollama: goes after the fast cloud providers by default…', names()[0] === 'Groq' && names().at(-1) === 'Ollama (qwen2.5)', names().join())
 process.env.OLLAMA_FIRST = 'on'
 ok('ollama: …and first (after Groq) with OLLAMA_FIRST=on', names().indexOf('Ollama') < names().indexOf('Groq (openai/gpt-oss-20b)') || names().indexOf('Ollama') <= 3, names().join())
+reset()
+
+// ───────── OmniRoute ─────────
+reset()
+ok('omniroute: nothing is added without both an address and a model', omnirouteConfig({ OMNIROUTE_BASE_URL: 'https://r.example.com' }) === null && omnirouteConfig({ OMNIROUTE_MODEL: 'auto' }) === null && !names().includes('OmniRoute'))
+process.env.OMNIROUTE_BASE_URL = 'https://r.example.com/'
+process.env.OMNIROUTE_MODEL = 'auto,fast'
+ok('omniroute: each model is its own provider', names().join() === 'OmniRoute,OmniRoute (fast)', names().join())
+ok('omniroute: /v1 is added once, and the key is passed on', omnirouteConfig({ OMNIROUTE_BASE_URL: 'https://r.example.com/', OMNIROUTE_MODEL: 'a', OMNIROUTE_API_KEY: ' k ' })?.base === 'https://r.example.com/v1' && omnirouteConfig({ OMNIROUTE_BASE_URL: 'http://localhost:20128/v1', OMNIROUTE_MODEL: 'a' })?.base === 'http://localhost:20128/v1' && omnirouteConfig({ OMNIROUTE_BASE_URL: 'https://r.example.com', OMNIROUTE_MODEL: 'a', OMNIROUTE_API_KEY: ' k ' })?.key === 'k')
+ok('omniroute: a nonsense address is refused', omnirouteConfig({ OMNIROUTE_BASE_URL: 'javascript:alert(1)', OMNIROUTE_MODEL: 'a' }) === null && omnirouteConfig({ OMNIROUTE_BASE_URL: 'file:///etc', OMNIROUTE_MODEL: 'a' }) === null)
 reset()
 
 // ───────── talking to a (fake) OpenAI-compatible server ─────────

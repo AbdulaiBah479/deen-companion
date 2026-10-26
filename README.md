@@ -84,6 +84,7 @@ Zakat with live prices, mosque finder, Ramadan tracker, dhikr, kids mode, backup
 | Cloud AI | `GEMINI_API_KEY` | https://aistudio.google.com |
 | Cloud AI (more fallbacks) | `GROQ_API_KEY`, `MISTRAL_API_KEY`, `OPENROUTER_API_KEY`, `CEREBRAS_*`, Cloudflare | provider consoles |
 | **Ollama** (local model or Ollama Cloud) | `OLLAMA_MODEL=llama3.1` (+ `OLLAMA_BASE_URL`, or `OLLAMA_API_KEY` for the cloud; `OLLAMA_FIRST=on` to prefer it) | [Ollama](https://ollama.com) |
+| **OmniRoute** (AI gateway) | `OMNIROUTE_BASE_URL=https://your-host` + `OMNIROUTE_API_KEY` + `OMNIROUTE_MODEL` (model or combo names) | search “OmniRoute” |
 | **Unlimited local AI server** | `CUSTOM_AI_BASE_URL=http://localhost:11434/v1` + `CUSTOM_AI_MODEL` | [Ollama](https://ollama.com) |
 | Identify a verse from an audio clip | `GROQ_API_KEY` (Whisper) or `STT_*` | https://console.groq.com |
 | Reels video backgrounds | `PEXELS_API_KEY` (free, 200 requests/hour; results are cached) | https://www.pexels.com/api/ |

@@ -205,6 +205,17 @@ export function ollamaConfig(env: Record<string, string | undefined>): { base: s
   return { base, key, models }
 }
 
+// OmniRoute settings (an OpenAI-compatible gateway that routes between many AI services): its address, a key made in its dashboard,
+// and the model or "combo" names to ask for. Null until an address and at least one model are set.
+export function omnirouteConfig(env: Record<string, string | undefined>): { base: string; key?: string; models: string[] } | null {
+  const models = list(env.OMNIROUTE_MODEL)
+  const raw = env.OMNIROUTE_BASE_URL?.trim()
+  if (!models.length || !raw || !/^https?:[/][/]/i.test(raw)) return null
+  let base = raw.replace(/[/]+$/, '')
+  if (!/[/]v1$/.test(base)) base += '/v1'
+  return { base, key: env.OMNIROUTE_API_KEY?.trim() || undefined, models }
+}
+
 export function configuredProviders(): Provider[] {
   const env = process.env
   const out: Provider[] = []
@@ -298,6 +309,13 @@ export function configuredProviders(): Provider[] {
   if (ollama) {
     ollama.models.forEach((model, i) =>
       out.push({ name: i === 0 ? 'Ollama' : 'Ollama (' + model + ')', run: (system, history) => openAICompatible(override || ollama.base, ollama.key, model, chat(system, history)) })
+    )
+  }
+  // 8. OmniRoute: one address that spreads questions over many AI services and falls back by itself.
+  const omni = omnirouteConfig(env)
+  if (omni) {
+    omni.models.forEach((model, i) =>
+      out.push({ name: i === 0 ? 'OmniRoute' : 'OmniRoute (' + model + ')', run: (system, history) => openAICompatible(override || omni.base, omni.key, model, chat(system, history)) })
     )
   }
   // Groq answers in about a second, so it goes first; everything else keeps its order. OLLAMA_FIRST=on puts a local model first.

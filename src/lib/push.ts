@@ -191,6 +191,17 @@ export async function saveReminder(r: Reminder) {
   ])
   return id
 }
+// The scheduler's heartbeat: when did something last ask the app to send due reminders? Used to warn when nothing is calling it.
+export async function markRun(now = Date.now()) {
+  await redis([['SET', 'push:lastrun', String(now), 'EX', 7 * 86400]])
+}
+export async function lastRunAgeMin(now = Date.now()): Promise<number | null> {
+  const [raw] = await redis([['GET', 'push:lastrun']])
+  const t = Number(raw)
+  return Number.isFinite(t) && t > 0 ? Math.max(0, (now - t) / 60_000) : null
+}
+export const SCHEDULER_STALE_MIN = 20
+
 export async function deleteReminder(endpoint: string) {
   const id = subId(endpoint)
   await redis([['DEL', `push:sub:${id}`], ['SREM', 'push:ids', id]])

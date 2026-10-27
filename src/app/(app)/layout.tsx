@@ -3,6 +3,7 @@ import AppNav from '@/components/AppNav'
 import InstallBanner from '@/components/InstallApp'
 import LocationPrompt from '@/components/LocationPrompt'
 import MiniPlayer from '@/components/MiniPlayer'
+import PushTick from '@/components/PushTick'
 import AudioProvider from '@/lib/audio'
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -16,6 +17,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         {children}
       </main>
       <LocationPrompt />
+      <PushTick />
       <Suspense fallback={null}>
         <MiniPlayer />
       </Suspense>

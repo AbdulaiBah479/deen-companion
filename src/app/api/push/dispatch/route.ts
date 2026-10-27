@@ -1,6 +1,6 @@
 import { timingSafeEqual } from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
-import { dispatch, pushConfigured } from '@/lib/push'
+import { dispatch, markRun, pushConfigured } from '@/lib/push'
 
 // POST /api/push/dispatch — called every few minutes by a scheduler (see .github/workflows/prayer-reminders.yml).
 // Needs  Authorization: Bearer <CRON_SECRET>.  Sends every reminder whose prayer time has just arrived.
@@ -20,7 +20,9 @@ export async function POST(request: NextRequest) {
   const now = Number.isFinite(fake) ? new Date(fake) : new Date()
   const windowMin = Math.min(15, Math.max(1, Number(request.nextUrl.searchParams.get('window')) || 6))
   try {
-    return NextResponse.json({ ok: true, ...(await dispatch(now, windowMin)) })
+    const out = await dispatch(now, windowMin)
+    await markRun().catch(() => {})
+    return NextResponse.json({ ok: true, ...out })
   } catch {
     return NextResponse.json({ error: 'Dispatch failed' }, { status: 500 })
   }

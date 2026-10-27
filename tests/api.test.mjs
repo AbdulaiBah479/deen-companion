@@ -545,6 +545,16 @@ for (let i = 0; i < 20; i++) if ((await ask('salaam ' + i)).status === 429) limi
   ok('circle: when the last person leaves, the circle is gone', (await fetch(`${APP}/api/circle?code=${cd.code}&device=${dev(1)}`)).status === 404)
 }
 
+// ───────── the reminder scheduler's heartbeat and backup ─────────
+{
+  const dispatchNow = await fetch(`${APP}/api/push/dispatch`, { method: 'POST', headers: { Authorization: 'Bearer ' + (process.env.CRON_SECRET || 'test-cron-secret-0123456789') } })
+  const st = await (await fetch(`${APP}/api/push/status`)).json()
+  ok('scheduler: after a dispatch the status says reminders are running (schedulerOk)', st.configured === true && typeof st.schedulerOk === 'boolean' && (dispatchNow.status !== 200 || st.schedulerOk === true), JSON.stringify({ d: dispatchNow.status, st }))
+  const t1 = await (await fetch(`${APP}/api/push/tick`, { method: 'POST' })).json()
+  const t2 = await (await fetch(`${APP}/api/push/tick`, { method: 'POST' })).json()
+  ok('scheduler backup: the tick endpoint runs at most once every few minutes, whoever calls it', typeof t1.ran === 'boolean' && t2.ran === false, JSON.stringify([t1, t2]))
+}
+
 ok('rate limit: a burst beyond 15/min is refused with 429 + Retry-After', limited > 0, `${limited} of 20 refused`)
 
 console.log(fails ? `\n${fails} FAILED` : '\nALL PASSED')

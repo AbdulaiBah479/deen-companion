@@ -26,7 +26,7 @@ function whereOf(place: Place): { lat: number; lng: number; tz: string } | null 
 
 // Prayer page: "Remind me even when the app is closed" (Web Push). Hidden on servers that haven't set reminders up.
 export default function PushReminders({ place, method }: { place: Place; method: number }) {
-  const [status, setStatus] = useState<{ configured: boolean; publicKey: string | null } | null>(null)
+  const [status, setStatus] = useState<{ configured: boolean; publicKey: string | null; schedulerOk?: boolean } | null>(null)
   const [saved, setSaved, ready] = useStored<Saved>('deen:push', DEFAULT)
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState('')
@@ -144,6 +144,11 @@ export default function PushReminders({ place, method }: { place: Place; method:
         <input type="checkbox" checked={saved.on} disabled={busy} onChange={(e) => (e.target.checked ? enable() : disable())} aria-label="Remind me even when the app is closed" />
         Remind me even when the app is closed
       </label>
+      {saved.on && status.schedulerOk === false && (
+        <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-2 mt-2" role="status" data-testid="scheduler-warning">
+          Reminders from the server are not running right now, so they may not arrive while the app is closed. Keep the app open for the adhan, and the owner has been alerted.
+        </p>
+      )}
       <p className="text-xs text-gray-500 mt-1">Sent to this device as a notification. Needs your location (so the times are right) and notification permission.</p>
       {saved.on && (
         <div className="mt-3 space-y-2 text-sm">

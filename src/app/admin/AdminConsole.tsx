@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import { checkEmailLocally } from '@/lib/email-check'
 import AdminCauses from './AdminCauses'
 
 type Status = 'up' | 'degraded' | 'down'
@@ -17,6 +18,7 @@ type Overview = {
     providers: { name: string; available: boolean; retryInSeconds: number; reason?: string; session: { ok: number; fail: number; ewmaMs: number } | null; history: { ok: number; fail: number; ewmaMs: number; lastError?: string; lastOk?: number } | null }[]
     discoveredModels: Record<string, string[]>
   }
+  todo?: { id: string; done: boolean; unknown?: boolean; title: string; how: string }[]
   reminders: { configured: boolean; devices: number | null; adminDevices: number }
   config: Record<string, boolean | number>
 }
@@ -172,6 +174,15 @@ export default function AdminConsole() {
     await load()
   }
 
+  async function removeMany(list: { id: string; email: string }[]) {
+    const names = list.map((u) => u.email).join(', ')
+    if (!confirm(`Delete these ${list.length} account(s)? ${names}. Their saved progress is removed too. This cannot be undone.`)) return
+    let done = 0
+    for (const u of list) if ((await fetch(`/api/admin/users?id=${u.id}`, { method: 'DELETE' })).ok) done++
+    setNote(`Deleted ${done} of ${list.length} account(s).`)
+    await load()
+  }
+
   if (state === 'loading') return <main className="p-6 text-gray-500">Loading…</main>
 
   if (state === 'signed-out') {
@@ -211,6 +222,21 @@ export default function AdminConsole() {
         <div className={`rounded-xl border p-4 font-semibold ${banner[0]}`} role="status">{banner[1]}</div>
       )}
       {note && <p className="text-sm text-[#0F766E]" role="status">{note}</p>}
+
+      {d.todo && d.todo.some((t) => !t.done) && (
+        <section aria-labelledby="h-todo" className="bg-amber-50 border border-amber-200 rounded-xl p-4" data-testid="admin-todo">
+          <h2 id="h-todo" className="font-bold mb-1">Your to-do list ({d.todo.filter((t) => !t.done).length} left)</h2>
+          <p className="text-xs text-amber-900 mb-2">Worked out live from the app’s set-up. Each item ticks itself when it is done.</p>
+          <ul className="space-y-2">
+            {d.todo.map((t) => (
+              <li key={t.id} className="text-sm">
+                <p className="font-semibold">{t.done ? '✅' : t.unknown ? '❔' : '⬜'} {t.title}</p>
+                {!t.done && <p className="text-xs text-gray-700 ml-6">{t.unknown ? 'Could not check this automatically. ' : ''}{t.how}</p>}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <section aria-labelledby="h-health">
         <h2 id="h-health" className="font-bold mb-2">Health</h2>
@@ -292,10 +318,19 @@ export default function AdminConsole() {
           ) : (
             <>
               <p className="mb-2"><b>{users.total}</b> account(s). Newest first:</p>
+              {(() => {
+                const fake = (users.users ?? []).filter((u) => !checkEmailLocally(u.email).ok)
+                return fake.length > 0 ? (
+                  <p className="mb-2 rounded-lg bg-red-50 border border-red-200 p-2 text-red-800 text-xs" data-testid="fake-accounts">
+                    {fake.length} account(s) use an e-mail that looks fake or temporary (marked ⚠ below).{' '}
+                    <button onClick={() => removeMany(fake)} className="underline font-semibold">Delete them</button>
+                  </p>
+                ) : null
+              })()}
               <ul className="divide-y divide-gray-100">
                 {users.users?.map((u) => (
                   <li key={u.id} className="py-2 flex items-center gap-2">
-                    <span className="min-w-0 flex-1"><span className="block truncate font-medium">{u.email}</span><span className="block text-xs text-gray-500">{u.name || 'no name'} · joined {ago(Date.parse(u.created))} · {u.confirmed ? 'email confirmed' : 'not confirmed'}{u.lastSignIn ? ` · last in ${ago(Date.parse(u.lastSignIn))}` : ''}</span></span>
+                    <span className="min-w-0 flex-1"><span className="block truncate font-medium">{!checkEmailLocally(u.email).ok && <span title="looks fake or temporary">⚠ </span>}{u.email}</span><span className="block text-xs text-gray-500">{u.name || 'no name'} · joined {ago(Date.parse(u.created))} · {u.confirmed ? 'email confirmed' : 'not confirmed'}{u.lastSignIn ? ` · last in ${ago(Date.parse(u.lastSignIn))}` : ''}</span></span>
                     <button onClick={() => removeUser(u.id, u.email)} className="text-xs text-red-600 underline shrink-0">Delete</button>
                   </li>
                 ))}

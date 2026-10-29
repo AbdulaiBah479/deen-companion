@@ -28,6 +28,11 @@ export default function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
     try {
       const supabase = createClient()
       if (mode === 'signup') {
+        // Is this a real, working e-mail address? (a filter; the confirmation e-mail is what proves it is yours)
+        const check = await fetch('/api/account/check-email', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) })
+          .then((r) => r.json() as Promise<{ ok: boolean; reason?: string }>)
+          .catch(() => ({ ok: true as boolean, reason: undefined as string | undefined })) // if the check itself cannot run, do not block a real person
+        if (!check.ok) throw new Error(check.reason || 'Please use your real e-mail address.')
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
@@ -35,10 +40,10 @@ export default function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
         })
         if (error) throw error
         if (data.session) router.push('/dashboard')
-        else setNotice('Check your email to confirm your account, then sign in.')
+        else setNotice('We sent a confirmation link to your e-mail. Open it, then come back and sign in.')
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password })
-        if (error) throw error
+        if (error) throw new Error(/not confirmed/i.test(error.message) ? 'Please confirm your e-mail first: open the link we sent you, then sign in.' : error.message)
         router.push('/dashboard')
       }
     } catch (err) {

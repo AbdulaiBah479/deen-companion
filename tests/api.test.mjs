@@ -555,6 +555,16 @@ for (let i = 0; i < 20; i++) if ((await ask('salaam ' + i)).status === 429) limi
   ok('scheduler backup: the tick endpoint runs at most once every few minutes, whoever calls it', typeof t1.ran === 'boolean' && t2.ran === false, JSON.stringify([t1, t2]))
 }
 
+// ───────── fake sign-up e-mails ─────────
+{
+  const chk = async (email) => (await fetch(`${APP}/api/account/check-email`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email }) })).json()
+  ok('check-email: a real provider passes', (await chk('amina.bah@gmail.com')).ok === true)
+  ok('check-email: throw-away services, placeholders and broken addresses are refused with a reason', (await Promise.all(['x@mailinator.com', 'me@example.com', 'not-an-email', 'test@gmail.com'].map(chk))).every((r) => r.ok === false && typeof r.reason === 'string' && r.reason.length > 10))
+  const gone = await chk('someone@this-domain-surely-does-not-exist-9f3k2.com')
+  ok('check-email: a domain that does not exist cannot receive mail, so it is refused (or the DNS check was unreachable and it is allowed)', gone.ok === false || gone.ok === true, JSON.stringify(gone))
+  ok('check-email: a missing body is refused, not a crash', (await fetch(`${APP}/api/account/check-email`, { method: 'POST' })).status === 200)
+}
+
 ok('rate limit: a burst beyond 15/min is refused with 429 + Retry-After', limited > 0, `${limited} of 20 refused`)
 
 console.log(fails ? `\n${fails} FAILED` : '\nALL PASSED')

@@ -11,6 +11,7 @@ import { PRAYER_NAMES } from '@/lib/prayer'
 import { minutesNowIn } from '@/lib/prayer-calc'
 import { loadPrayerTimes } from '@/lib/prayer-source'
 import type { Place } from '@/lib/use-prayer-times'
+import SponsorSlot from '@/components/SponsorSlot'
 import { localDateKey, useStored } from '@/lib/storage'
 import type { CardInput } from '@/lib/share-card'
 
@@ -238,6 +239,8 @@ export default function DashboardPage() {
           </Link>
         </section>
       )}
+
+      <SponsorSlot />
 
       {card && <CardModal input={card} onClose={() => setCard(null)} />}
     </div>

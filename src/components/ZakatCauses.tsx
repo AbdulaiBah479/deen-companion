@@ -35,6 +35,16 @@ export default function ZakatCauses() {
       </h2>
       <p className="text-sm text-gray-600 mt-1">Real causes people are giving to right now. Each opens the charity’s own website — this app never handles your money.</p>
 
+      <details className="mt-3 rounded-2xl border border-teal-200 bg-teal-50 p-4 text-sm text-teal-900" data-testid="how-gift-reaches">
+        <summary className="cursor-pointer font-bold">How your gift reaches people</summary>
+        <ol className="list-decimal pl-5 mt-2 space-y-1">
+          <li>You press “Give via …”. That opens the charity’s <strong>own website</strong>; you pay there, not here.</li>
+          <li>This app never sees your card or bank details and takes <strong>no share</strong> of what you give.</li>
+          <li>The charity sends you its own receipt. Keep it: it shows the amount, the date and, for zakat, which fund you chose.</li>
+          <li>Each charity publishes how it spends money in an annual report. Where we have the link, it is shown under the cause (“How it is used”). Read it before you give.</li>
+        </ol>
+      </details>
+
       <div className="flex flex-wrap gap-2 mt-3" role="group" aria-label="Filter causes">
         <button onClick={() => setFilter('all')} aria-pressed={filter === 'all'} className={`px-3 py-1.5 rounded-full text-sm border ${filter === 'all' ? 'bg-[#0F766E] border-[#0F766E] text-white' : 'border-gray-300 bg-white'}`}>
           All
@@ -78,6 +88,17 @@ export default function ZakatCauses() {
                   <p className="mt-1">{c.zakatNote}</p>
                 </details>
               )}
+              <details className="mt-2 text-xs text-gray-600" data-testid="cause-howused">
+                <summary className="cursor-pointer font-semibold">How it is used</summary>
+                <p className="mt-1">{c.regNumber ?? 'Registration details: not added yet — ask the charity for its registration number before you give.'}</p>
+                <p className="mt-1">
+                  {c.reportUrl ? (
+                    <a href={c.reportUrl} target="_blank" rel="noopener noreferrer" className="underline text-[#0F766E]">Read its annual report ↗</a>
+                  ) : (
+                    'Annual report: not linked yet — look for “annual report” or “financial statements” on its website.'
+                  )}
+                </p>
+              </details>
               <div className="flex flex-wrap gap-2 mt-3">
                 {c.links.map((l) => (
                   <a key={l.url} href={l.url} target="_blank" rel="noopener noreferrer" className="px-3 py-1.5 rounded-lg border border-[#0F766E] text-[#0F766E] text-sm font-semibold">

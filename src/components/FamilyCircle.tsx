@@ -58,7 +58,7 @@ export default function FamilyCircle() {
     async (code: string) => {
       if (!device) return
       try {
-        const r = await fetch(`/api/circle?code=${code}&device=${device}&lang=${lang}`, { cache: 'no-store' })
+        const r = await fetch(`/api/circle?code=${code}&device=${device}&lang=${lang}&date=${localDay()}`, { cache: 'no-store' })
         const d = await r.json()
         if (!r.ok) throw new Error(d.error)
         setView(d)

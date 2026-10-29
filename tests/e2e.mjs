@@ -824,6 +824,15 @@ await clickText('Women in Islam'); await sleep(500)
 t('library: a Women in Islam shelf lists the mothers of the believers and other great women', /Hafsa/.test(await text()) && /Khadija/.test(await text()) && /Fatima al-Fihri/.test(await text()))
 
 
+// ============================ Support, sponsors, how a gift reaches people ============================
+await goto('/support'); await waitFor('!!document.querySelector("[data-testid=ledger]")', 20000)
+t('support: the page says it is sadaqah not zakat, shows a public ledger, and lists the promises (no ads in worship screens)', /not zakat/i.test(await text()) && /Where the money goes/.test(await text()) && /No ads or sponsor banners inside the Quran/.test(await text()))
+t('support: with no giving link set it says giving is not open yet instead of showing a dead button', !!(await ev('!!document.querySelector("[data-testid=support-soon], [data-testid=support-give]")')))
+await goto('/sponsor'); await waitFor('/The rules/.test(document.body.innerText)', 15000)
+t('sponsor: businesses can read the rules (halal only, labelled, never in worship screens, no tracking)', /Halal businesses/.test(await text()) && /Always labelled/.test(await text()) && /Never inside worship screens/.test(await text()))
+await goto('/zakat'); await waitFor('document.querySelectorAll("[data-testid=cause-howused]").length>=6', 25000)
+t('zakat: it explains how a gift reaches people (the charity own site, no share taken, its receipt) and each cause has a How it is used box', /takes no share/i.test(await ev('document.querySelector("[data-testid=how-gift-reaches]").textContent')) && (await ev('document.querySelectorAll("[data-testid=cause-howused]").length')) >= 6)
+
 // ============================ Verse Journey ============================
 await goto('/journey'); await waitFor('document.querySelectorAll("[data-testid=journey-feelings] li").length>=13', 20000)
 t('journey: the feelings list offers 13 situations', true)
@@ -1210,7 +1219,7 @@ await click('#causes input[type=checkbox]'); await sleep(300)
 t('zakat: "only zakat-eligible" hides the water wells (sadaqah jariyah)', !/Clean water wells/.test(await text()) && /Gaza: emergency relief/.test(await text()))
 await clickText('Orphans & children', 'button'); await sleep(300)
 t('zakat: filtering by type shows only orphan causes', /Caring for orphans/.test(await text()) && !/Feeding the hungry/.test(await text()))
-t('zakat: the eight categories of 9:60 are explained', (await ev('document.querySelector("#causes > details > summary")?.innerText||""')).includes('eight categories'))
+t('zakat: the eight categories of 9:60 are explained', (await ev('[...document.querySelectorAll("#causes > details > summary")].map(s=>s.innerText).join("|")')).includes('eight categories'))
 
 await goto('/ruqyah'); await waitFor('/Understanding ruqyah/.test(document.body.innerText)', 15000)
 const rt = await text()

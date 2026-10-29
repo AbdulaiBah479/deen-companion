@@ -29,6 +29,8 @@ export type Cause = {
   zakatNote: string
   links: CauseLink[]
   active: boolean
+  regNumber?: string // the charity's registration, e.g. "Registered charity no. 328158 (England & Wales)"
+  reportUrl?: string // a link to its annual report or financial statements
 }
 
 // A charity link must be a normal https address on a real-looking domain name. Refused on purpose: passwords in the address,
@@ -68,8 +70,11 @@ export function parseCause(body: unknown): Cause | null {
     if (!name || !isHttps(url)) return null // a bad link is refused, not silently dropped
     links.push({ name, url })
   }
+  const regNumber = clean(b.regNumber, 120)
+  const reportUrl = clean(b.reportUrl, 300)
+  if (reportUrl && !isHttps(reportUrl)) return null // a bad report link is refused too
   if (!id || !title || !summary || !category || !zakat || !links.length) return null
-  return { id, title, summary, category, zakat, zakatNote, links, active: b.active !== false }
+  return { id, title, summary, category, zakat, zakatNote, links, active: b.active !== false, ...(regNumber ? { regNumber } : {}), ...(reportUrl ? { reportUrl } : {}) }
 }
 
 const NOTE = 'Not a fatwa — if unsure, ask a scholar, and ask the charity whether it runs a zakat-eligible fund.'

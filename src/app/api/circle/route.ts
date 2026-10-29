@@ -31,10 +31,11 @@ async function load(code: string): Promise<{ name: string; members: Record<strin
   return { name: (JSON.parse(m) as { name: string }).name, members }
 }
 
-async function viewFor(code: string, device: string, lang: string) {
+async function viewFor(code: string, device: string, lang: string, clientDay?: string | null) {
   const c = await load(code)
   if (!c) return null
-  const today = serverToday()
+  // The viewer's own calendar day (from their phone) when it is within a day of the server's, otherwise the server's.
+  const today = clientDay && dateAllowed(clientDay, serverToday()) ? clientDay : serverToday()
   const ref = weeklyVerse(today)
   const verse = resolveVerse(ref, lang)
   return {
@@ -59,7 +60,7 @@ export async function GET(request: NextRequest) {
   const limit = await rateLimit(`circle-get:${clientIp(request.headers)}`, 90, 600_000)
   if (!limit.ok) return bad('Too many requests, please slow down.', 429)
   const lang = sp.get('lang') || 'en'
-  const v = await viewFor(code, device, /^[a-z]{2}$/.test(lang) ? lang : 'en')
+  const v = await viewFor(code, device, /^[a-z]{2}$/.test(lang) ? lang : 'en', sp.get('date'))
   if (!v) return bad('No circle with that code.', 404)
   return NextResponse.json(v, { headers: { 'Cache-Control': 'no-store' } })
 }

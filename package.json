@@ -14,7 +14,7 @@
     "data": "node scripts/fetch-data.mjs",
     "test:search": "node --import ./tests/register-ts.mjs --experimental-strip-types --no-warnings tests/search.test.mts",
     "test:sync": "node --import ./tests/register-ts.mjs --experimental-strip-types --no-warnings tests/sync.test.mts",
-    "test": "npm run test:logic && npm run test:search && npm run test:sync && npm run test:resilience && npm run test:learn && npm run test:recite && npm run test:life && npm run test:guides && npm run test:fetch && npm run test:reels && npm run test:location && npm run test:stories && npm run test:library && npm run test:daily && npm run test:lectures && npm run test:heritage && npm run test:security && npm run test:providers && npm run test:ratelimit && npm run test:errors && npm run test:prayercalc && npm run test:offline && npm run test:push && npm run test:sleep && npm run test:autopilot && npm run test:playback && npm run test:causes && npm run test:care && npm run test:situations && npm run test:tafsir && npm run test:khutbah && npm run test:books && npm run test:adhan && npm run test:circle && npm run test:rituals && npm run test:email",
+    "test": "npm run test:logic && npm run test:search && npm run test:sync && npm run test:resilience && npm run test:learn && npm run test:recite && npm run test:life && npm run test:guides && npm run test:fetch && npm run test:reels && npm run test:location && npm run test:stories && npm run test:library && npm run test:daily && npm run test:lectures && npm run test:heritage && npm run test:security && npm run test:providers && npm run test:ratelimit && npm run test:errors && npm run test:prayercalc && npm run test:offline && npm run test:push && npm run test:sleep && npm run test:autopilot && npm run test:playback && npm run test:causes && npm run test:care && npm run test:situations && npm run test:tafsir && npm run test:khutbah && npm run test:books && npm run test:adhan && npm run test:circle && npm run test:rituals && npm run test:email && npm run test:support",
     "prebuild": "node scripts/fetch-data.mjs",
     "test:resilience": "node --import ./tests/register-ts.mjs --experimental-strip-types --no-warnings tests/resilience.test.mts",
     "test:learn": "node --import ./tests/register-ts.mjs --experimental-strip-types --no-warnings tests/learn.test.mts",
@@ -62,7 +62,8 @@
     "test:circle": "node --import ./tests/register-ts.mjs --experimental-strip-types --no-warnings tests/circle.test.mts",
     "check:books": "node --experimental-strip-types --no-warnings scripts/check-books.mjs",
     "test:rituals": "node --import ./tests/register-ts.mjs --experimental-strip-types --no-warnings tests/rituals.test.mts",
-    "test:email": "node --import ./tests/register-ts.mjs --experimental-strip-types --no-warnings tests/email.test.mts"
+    "test:email": "node --import ./tests/register-ts.mjs --experimental-strip-types --no-warnings tests/email.test.mts",
+    "test:support": "node --import ./tests/register-ts.mjs --experimental-strip-types --no-warnings tests/support.test.mts"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",

@@ -3,6 +3,9 @@ import { adminDeviceCount } from '@/lib/alerts'
 import { aiPerformance, aiStatus, configuredProviders } from '@/lib/ai'
 import { requireAdmin } from '@/lib/admin-guard'
 import { readCounters, readIncidents, readProviderStats, readStatuses, readTopErrors, readDiscoveredModels } from '@/lib/ops'
+import { readCauses } from '@/lib/causes'
+import { readLedger } from '@/lib/support'
+import { donateLink } from '@/lib/support-shared'
 import { SCHEDULER_STALE_MIN, lastRunAgeMin, pushConfigured } from '@/lib/push'
 import { redis, redisConfigured } from '@/lib/redis'
 
@@ -35,6 +38,8 @@ export async function GET(request: NextRequest) {
     } catch {}
   }
   const providers = configuredProviders().length
+  const [{ causes }, ledger] = await Promise.all([readCauses(), readLedger()])
+  const activeCauses = causes.filter((c) => c.active)
   const todo = [
     { id: 'scheduler', done: schedulerAge !== null && schedulerAge <= SCHEDULER_STALE_MIN, title: 'Prayer reminders run on schedule', how: 'On GitHub: repo Settings → Secrets and variables → Actions. Add APP_URL (https://deen-companion-six.vercel.app) and CRON_SECRET (the value from .env.vercel), then Actions → Prayer reminders → Run workflow.' },
     { id: 'confirm-email', done: confirmEmail === true, unknown: confirmEmail === null, title: 'Sign-ups must confirm their e-mail', how: 'Supabase → Authentication → SMTP Settings (add a free Resend or Brevo sender), then Authentication → Sign In / Providers → Email → switch Confirm email on.' },
@@ -42,6 +47,9 @@ export async function GET(request: NextRequest) {
     { id: 'ai', done: providers >= 3, title: 'At least three AI services are set up (so one outage never stops the AI)', how: 'Add more free keys in Vercel → Settings → Environment Variables (Gemini, Groq, Mistral, OpenRouter, GitHub Models…). Optional: OLLAMA_API_KEY + OLLAMA_MODEL, or OMNIROUTE_BASE_URL + OMNIROUTE_API_KEY + OMNIROUTE_MODEL.' },
     { id: 'site-url', done: set('NEXT_PUBLIC_SITE_URL'), title: 'The site address is set (for share links and search engines)', how: 'Vercel → Environment Variables: NEXT_PUBLIC_SITE_URL = https://deen-companion-six.vercel.app (or your own domain).' },
     { id: 'contact', done: set('NEXT_PUBLIC_OPERATOR_NAME') && set('NEXT_PUBLIC_CONTACT_EMAIL'), title: 'Your name and contact e-mail are on the privacy page', how: 'Vercel → Environment Variables: NEXT_PUBLIC_OPERATOR_NAME and NEXT_PUBLIC_CONTACT_EMAIL.' },
+    { id: 'cause-details', done: activeCauses.length > 0 && activeCauses.every((c) => !!c.regNumber && !!c.reportUrl), title: 'Every charity on the Zakat page shows its registration number and annual-report link', how: 'In this page, under "Where donations go", press Edit on each cause and fill in the registration number and the link to its annual report. Check each one on the regulator\'s website first.' },
+    { id: 'donate-link', done: !!donateLink(env.NEXT_PUBLIC_DONATE_URL), title: 'The Support page has a giving link', how: 'Open an Open Collective, GitHub Sponsors or Ko-fi page, then add its https:// address in Vercel as NEXT_PUBLIC_DONATE_URL and Redeploy.' },
+    { id: 'ledger', done: ledger.months.length > 0, title: 'The public "Where the money goes" ledger has its first month', how: 'In this page, under "Support page", press Add or change a month and type the real figures.' },
     { id: 'pexels', done: set('PEXELS_API_KEY'), title: 'Reels have video backgrounds', how: 'Free key at pexels.com/api, then add PEXELS_API_KEY in Vercel.' },
   ]
 

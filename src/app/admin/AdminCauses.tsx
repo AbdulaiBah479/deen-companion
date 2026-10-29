@@ -3,9 +3,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import { CAUSE_CATEGORIES, ZAKAT_FIT_LABEL, type Cause, type ZakatFit } from '@/lib/causes-shared'
 
-type Draft = { id: string; title: string; summary: string; category: string; zakat: ZakatFit; zakatNote: string; links: string; active: boolean }
-const EMPTY: Draft = { id: '', title: '', summary: '', category: 'emergency', zakat: 'depends', zakatNote: '', links: '', active: true }
-const toDraft = (c: Cause): Draft => ({ ...c, links: c.links.map((l) => `${l.name} | ${l.url}`).join('\n') })
+type Draft = { id: string; title: string; summary: string; category: string; zakat: ZakatFit; zakatNote: string; links: string; active: boolean; regNumber: string; reportUrl: string }
+const EMPTY: Draft = { id: '', title: '', summary: '', category: 'emergency', zakat: 'depends', zakatNote: '', links: '', active: true, regNumber: '', reportUrl: '' }
+const toDraft = (c: Cause): Draft => ({ ...c, regNumber: c.regNumber ?? '', reportUrl: c.reportUrl ?? '', links: c.links.map((l) => `${l.name} | ${l.url}`).join('\n') })
 
 // Owner's editor for "Where your zakat can go": add, change, hide or remove causes. Every link must start with https://.
 export default function AdminCauses() {
@@ -126,6 +126,8 @@ export default function AdminCauses() {
           </div>
           <label className="block">Short note on zakat (optional)<textarea value={draft.zakatNote} onChange={(e) => setDraft({ ...draft, zakatNote: e.target.value })} maxLength={400} rows={2} className="mt-1 w-full px-2 py-1.5 rounded border border-gray-300 bg-white" /></label>
           <label className="block">Websites — one per line, as: Name | https://address<textarea value={draft.links} onChange={(e) => setDraft({ ...draft, links: e.target.value })} rows={3} required className="mt-1 w-full px-2 py-1.5 rounded border border-gray-300 bg-white font-mono text-xs" placeholder={'Islamic Relief | https://www.islamic-relief.org'} /></label>
+          <label className="block">Registration (e.g. “Registered charity no. 328158, England &amp; Wales”)<input value={draft.regNumber} onChange={(e) => setDraft({ ...draft, regNumber: e.target.value })} maxLength={120} className="mt-1 w-full px-2 py-1.5 rounded border border-gray-300 bg-white" /></label>
+          <label className="block">Link to its annual report or accounts (https://…)<input value={draft.reportUrl} onChange={(e) => setDraft({ ...draft, reportUrl: e.target.value })} maxLength={300} className="mt-1 w-full px-2 py-1.5 rounded border border-gray-300 bg-white" /></label>
           <label className="flex items-center gap-2"><input type="checkbox" checked={draft.active} onChange={(e) => setDraft({ ...draft, active: e.target.checked })} /> Show on the Zakat page</label>
           <div className="flex gap-2">
             <button disabled={busy} className="px-3 py-2 rounded-lg bg-[#0F766E] text-white font-semibold disabled:opacity-50">Save</button>

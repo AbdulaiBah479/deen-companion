@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import SponsorSlot from '@/components/SponsorSlot'
 import { useStored } from '@/lib/storage'
 
 const ITEMS = [
@@ -38,6 +39,7 @@ const ITEMS = [
   { href: '/ruqyah', icon: '🛡️', title: 'Ruqyah', desc: 'Protection & healing from the Quran and Sunnah', kids: false },
   { href: '/ramadan', icon: '🌙', title: 'Ramadan Tracker', desc: 'Fasting & Quran goals', kids: true },
   { href: '/donate', icon: '💚', title: 'Sadaqah Journal', desc: 'Track your giving', kids: false },
+  { href: '/support', icon: '🤝', title: 'Support the app', desc: 'Keep it free, and see where the money goes', kids: false },
   { href: '/report', icon: '⚑', title: 'Report a problem', desc: 'A mistake, a bug, or an idea', kids: false },
   { href: '/settings', icon: '⚙️', title: 'Settings', desc: 'Language, kids mode, backup', kids: true },
 ]
@@ -49,6 +51,7 @@ export default function MorePage() {
     <div>
       <h1 className="text-2xl font-black text-[#0F766E] mb-1">Everything else</h1>
       {kids && <p className="text-sm text-gray-500 mb-3">Kids mode is on — showing the child-friendly parts. Change it in Settings.</p>}
+      {!kids && <div className="mt-3"><SponsorSlot /></div>}
       <div className="grid grid-cols-2 gap-3 mt-3">
         {items.map((t) => (
           <Link

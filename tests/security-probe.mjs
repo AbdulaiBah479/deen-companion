@@ -45,7 +45,7 @@ ok('a cross-site pre-flight to the AI is not approved', !(pre.headers.get('acces
 
 // ───────── closed doors: the owner's tools and the scheduler ─────────
 const closed = [
-  ['GET', '/api/admin/overview'], ['GET', '/api/admin/users'], ['GET', '/api/admin/reports'], ['GET', '/api/admin/causes'],
+  ['GET', '/api/admin/overview'], ['GET', '/api/admin/users'], ['GET', '/api/admin/reports'], ['GET', '/api/admin/causes'], ['GET', '/api/admin/support'], ['POST', '/api/admin/support'],
   ['POST', '/api/admin/action'], ['POST', '/api/admin/alerts'], ['POST', '/api/admin/causes'], ['POST', '/api/admin/reports'],
   ['DELETE', '/api/admin/users?id=00000000-0000-0000-0000-000000000000'], ['DELETE', '/api/admin/reports?id=0123456789'], ['DELETE', '/api/admin/causes?id=gaza-relief'],
   ['POST', '/api/cron/watchdog'], ['POST', '/api/push/dispatch'],

@@ -388,6 +388,20 @@ ok('validation: oversize message -> 400', (await askPatient('a'.repeat(2500))).s
   await post('/api/admin/causes', { action: 'reset' }, ah)
   ok('causes: resetting returns to the starter list', (await (await fetch(`${APP}/api/admin/causes`, { headers: ah })).json()).customized === false)
 
+  // support page: the public ledger and the sponsor slot
+  const sup0 = await (await fetch(`${APP}/api/support`)).json()
+  ok('support: with nothing published the page gets an empty ledger, no sponsor, and no giving link unless one is set', Array.isArray(sup0.ledger?.months) && sup0.ledger.months.length === 0 && sup0.sponsor === null && 'donateUrl' in sup0)
+  ok('support: the editor is closed to visitors', (await fetch(`${APP}/api/admin/support`)).status === 401 && (await post('/api/admin/support', { ledger: { currency: 'USD', months: [] } })).status === 401)
+  const led = { currency: 'USD', months: [{ month: '2026-11', income: [{ label: 'Supporters', amount: 40 }], costs: [{ label: 'Hosting', amount: 20 }], note: 'First month' }] }
+  ok('support: the owner can publish a month', (await post('/api/admin/support', { ledger: led }, ah)).status === 200)
+  const sup1 = await (await fetch(`${APP}/api/support`)).json()
+  ok('support: visitors then see exactly those figures', sup1.ledger.months.length === 1 && sup1.ledger.months[0].income[0].amount === 40 && sup1.ledger.months[0].costs[0].label === 'Hosting')
+  ok('support: a bad figure refuses the save and leaves the old ledger alone', (await post('/api/admin/support', { ledger: { currency: 'USD', months: [{ month: '2026-12', income: [{ label: 'x', amount: -5 }], costs: [], note: '' }] } }, ah)).status === 400 && (await (await fetch(`${APP}/api/support`)).json()).ledger.months.length === 1)
+  ok('support: a sponsor with a non-https link is refused', (await post('/api/admin/support', { sponsor: { active: true, name: 'A', line: 'B', url: 'http://a.com' } }, ah)).status === 400 && (await post('/api/admin/support', { sponsor: { active: true, name: 'A', line: 'B', url: 'javascript:alert(1)' } }, ah)).status === 400)
+  ok('support: a good sponsor goes live and can be switched off', (await post('/api/admin/support', { sponsor: { active: true, name: 'Al-Noor Bookshop', line: 'Islamic books', url: 'https://alnoor.example.com' } }, ah)).status === 200 && (await (await fetch(`${APP}/api/support`)).json()).sponsor?.name === 'Al-Noor Bookshop' && (await post('/api/admin/support', { sponsor: { active: false, name: '', line: '', url: '' } }, ah)).status === 200 && (await (await fetch(`${APP}/api/support`)).json()).sponsor === null)
+  await post('/api/admin/support', { ledger: { currency: 'USD', months: [] } }, ah)
+
+
   // ruqyah verses
   const kursi = await (await fetch(`${APP}/api/quran/passage?surah=2&from=255&to=255`)).json()
   ok('passage: Ayat al-Kursi comes back with Arabic and a translation', kursi.verses?.length === 1 && /[؀-ۿ]{8,}/.test(kursi.verses[0].text_uthmani) && kursi.verses[0].translations[0].text.length > 20)
@@ -536,6 +550,13 @@ for (let i = 0; i < 20; i++) if ((await ask('salaam ' + i)).status === 429) limi
   ok('circle: a stranger cannot check in, and a far-away date is refused', (await call({ action: 'checkin', device: dev(9), code: cd.code, date: day })).status === 403 && (await call({ action: 'checkin', device: dev(2), code: cd.code, date: '2020-01-01' })).status === 400)
   const st = await (await fetch(`${APP}/api/circle?code=${cd.code}&device=${dev(2)}`)).json()
   ok('circle: the state shows both people, my row marked, the streak, and the verse of the week', st.members?.length === 2 && st.members[0].name === 'Omar' && st.members[0].me === true && st.members[0].streak === 1 && st.members[0].today === true && !!st.verse?.ref && !!st.question, JSON.stringify(st).slice(0, 200))
+  const ahead = new Date(Date.now() + 86400_000).toISOString().slice(0, 10) // a phone one day ahead of the server (east of UTC after local midnight)
+  const cj = await (await call({ action: 'create', device: dev(7), circle: 'East family', name: 'Yusuf' })).json()
+  await call({ action: 'checkin', device: dev(7), code: cj.code, date: ahead })
+  const east = await (await fetch(`${APP}/api/circle?code=${cj.code}&device=${dev(7)}&date=${ahead}`)).json()
+  ok('circle: a person whose phone is one day ahead of the server still sees their check-in and a streak of 1', east.members?.[0]?.today === true && east.members[0].streak === 1, JSON.stringify(east.members))
+  ok('circle: a made-up date is ignored, not trusted', (await (await fetch(`${APP}/api/circle?code=${cj.code}&device=${dev(7)}&date=2030-01-01`)).json()).members?.[0]?.today === false)
+  await call({ action: 'leave', device: dev(7), code: cj.code })
   ok('circle: nobody’s device id leaks in the reply', !JSON.stringify(st).includes(dev(1)) && !JSON.stringify(st).includes(dev(2)))
   ok('circle: bad requests are refused (no device, bad code, links as names)', (await call({ action: 'create', circle: 'x', name: 'y' })).status === 400 && (await fetch(`${APP}/api/circle?code=abc&device=${dev(1)}`)).status === 400 && (await call({ action: 'create', device: dev(4), circle: 'Spam', name: 'visit www.spam.com' })).status === 400)
   await call({ action: 'leave', device: dev(2), code: cd.code })

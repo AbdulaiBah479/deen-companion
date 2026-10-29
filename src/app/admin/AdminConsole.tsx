@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { checkEmailLocally } from '@/lib/email-check'
 import AdminCauses from './AdminCauses'
+import AdminSupport from './AdminSupport'
 
 type Status = 'up' | 'degraded' | 'down'
 type Component = { status: Status; since: number; checkedAt: number; detail: string; ms?: number }
@@ -365,6 +366,11 @@ export default function AdminConsole() {
             </ul>
           )}
         </div>
+      </section>
+
+      <section aria-labelledby="h-support">
+        <h2 id="h-support" className="font-bold mb-2">Support page: money ledger and sponsor</h2>
+        <AdminSupport />
       </section>
 
       <section aria-labelledby="h-causes">

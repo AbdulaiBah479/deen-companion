@@ -1,6 +1,10 @@
 name: Prayer reminders
 
-# Wakes the app every few minutes so it can send the prayer reminders that are due (Web Push).
+# Wakes the app so it can send the prayer reminders that are due (Web Push).
+#
+# WHY ONLY HOURLY: a private repository on GitHub's free plan gets 2,000 Actions minutes a month, and every run costs at least one.
+# Every 5 minutes would use about 8,600 a month and GitHub would stop all the jobs. So this is only a backup. The main clock is a
+# free timer at cron-job.org that calls the same address every 5 minutes (steps in the control room's to-do list).
 # GitHub's scheduler runs "every 5 minutes" at best, and sometimes a few minutes late — the app looks 6 minutes back each time,
 # so a reminder is still sent (once) if a run is late. For tighter timing use a free cron service (cron-job.org, 1-minute) to call
 # the same address instead, and turn this schedule off.
@@ -11,7 +15,7 @@ name: Prayer reminders
 
 on:
   schedule:
-    - cron: '*/5 * * * *'
+    - cron: '11 * * * *' # hourly backup only; a free outside timer (cron-job.org) is the main clock, see README
   workflow_dispatch:
 
 jobs:

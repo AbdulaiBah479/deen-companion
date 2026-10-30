@@ -201,3 +201,11 @@ Translations keep their translators’ copyright, which is why `./data` is gener
 ## Fake e-mails on sign-up
 
 The sign-up form refuses broken addresses, throw-away services and placeholders, and checks that the domain can receive mail (`/api/account/check-email`). That is only a filter. To make sure the person owns the address, switch on **Confirm email** in Supabase (Authentication → Sign In / Providers → Email) and connect your own mail sender (Authentication → SMTP Settings; Supabase's built-in sender allows only a couple of e-mails an hour). The app already shows "we sent a confirmation link" and a clear message when someone signs in before confirming.
+
+## The timers (important)
+
+Prayer reminders and the health checks need something to call the app on a schedule. GitHub's own timer is **not** enough on a private repository: the free plan gives 2,000 Actions minutes a month and a run every 5 minutes would use about 8,600. So:
+
+- **Main clock: cron-job.org (free).** Make two cron jobs, each sending a **POST** with the header `Authorization: Bearer <CRON_SECRET>`: `https://<your-site>/api/push/dispatch` every 5 minutes, and `https://<your-site>/api/cron/watchdog` every 10 minutes.
+- **Backup:** the two GitHub workflows still run, hourly and every 3 hours.
+- **Extra backup:** any phone with reminders switched on and the app open also nudges the server (`/api/push/tick`, at most once every 3 minutes).

@@ -1278,7 +1278,7 @@ await setInput('input[aria-label="Admin key"]', 'a-wrong-key-a-wrong-key-a-wrong
 t('admin: a wrong key is refused with a clear message', /That key is not right/.test(await text()))
 await setInput('input[aria-label="Admin key"]', 'test-admin-key-0123456789-abcdefghij'); await clickText('Open'); await waitFor('/Run checks/.test(document.body.innerText)', 15000)
 t('admin: the right key opens the control room', /Control room/.test(await text()) && /Run checks/.test(await text()))
-await waitFor('!!document.querySelector("[data-testid=admin-todo]")', 15000)
+await waitFor('document.body.innerText.includes("Prayer reminders run on schedule") && document.body.innerText.includes("confirm their e-mail")', 20000)
 t('admin: the control room shows the owner a to-do list that ticks itself', /Your to-do list/.test(await text()) && /Prayer reminders run on schedule/.test(await text()) && /confirm their e-mail/.test(await text()), (await text()).slice(0, 600))
 await clickText('Run checks'); await waitFor('/Checks finished/.test(document.body.innerText)', 40000)
 t('admin: "Run checks" runs the autopilot and reports', /Checks finished: everything important is fine/.test(await text()), (await text()).slice(0, 200).replace(/\n/g, ' '))

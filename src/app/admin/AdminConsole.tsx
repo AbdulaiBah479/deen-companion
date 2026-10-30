@@ -252,7 +252,7 @@ export default function AdminConsole() {
   const TABS: { id: Tab; label: string; badge?: number }[] = [
     { id: 'today', label: 'Today', badge: todoLeft.length + bad.length },
     { id: 'people', label: 'People', badge: openReports },
-    { id: 'money', label: 'Money & causes' },
+    { id: 'money', label: 'Money' },
     { id: 'system', label: 'System' },
   ]
   const card = 'bg-white border border-gray-200 rounded-xl p-4'
@@ -266,15 +266,15 @@ export default function AdminConsole() {
             <span className={`w-2 h-2 rounded-full ${DOT[worst]}`} aria-hidden="true" />
             {entries.length === 0 ? 'Not checked yet' : worst === 'up' ? 'All good' : worst === 'degraded' ? 'Needs attention' : 'Something is down'}
           </span>
-          <div className="ml-auto flex gap-2 text-sm">
+          <div className="flex gap-2 text-sm w-full sm:w-auto sm:ml-auto">
             <button onClick={() => act('check', 'Checks')} disabled={!!busy} className="px-3 py-1.5 rounded-lg bg-[#0F766E] text-white font-semibold disabled:opacity-50">{busy === 'check' ? 'Checking…' : 'Run checks'}</button>
             <button onClick={() => void load()} className="px-3 py-1.5 rounded-lg border border-gray-300 bg-white" aria-label="Refresh">⟳</button>
             <button onClick={async () => { await fetch('/api/admin/logout', { method: 'POST' }); setState('signed-out') }} className="px-3 py-1.5 rounded-lg border border-gray-300 bg-white">Sign out</button>
           </div>
         </div>
-        <nav className="flex gap-1 overflow-x-auto mt-2" role="tablist" aria-label="Sections">
+        <nav className="grid grid-cols-4 gap-1 mt-2" role="tablist" aria-label="Sections">
           {TABS.map((t) => (
-            <button key={t.id} role="tab" aria-selected={tab === t.id} onClick={() => setTab(t.id)} className={`shrink-0 px-4 py-2 text-sm font-semibold rounded-t-lg border-b-2 ${tab === t.id ? 'border-[#0F766E] text-[#0F766E]' : 'border-transparent text-gray-600'}`}>
+            <button key={t.id} role="tab" aria-selected={tab === t.id} onClick={() => setTab(t.id)} className={`px-1 py-2 text-sm font-semibold rounded-t-lg border-b-2 ${tab === t.id ? 'border-[#0F766E] text-[#0F766E]' : 'border-transparent text-gray-600'}`}>
               {t.label}
               {t.badge ? <span className="ml-1.5 text-[11px] bg-amber-500 text-white rounded-full px-1.5 py-0.5">{t.badge}</span> : null}
             </button>
@@ -294,7 +294,7 @@ export default function AdminConsole() {
           <>
             {stale && (
               <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900" data-testid="stale-checks">
-                <b>The automatic health checks have not run for {ago(newestCheck).replace(' ago', '')}.</b> They should run every 10 minutes. Press <b>Run checks</b> now. If this keeps happening, the GitHub job “Watchdog” is not running: open your repository → <b>Actions</b> → <b>Watchdog</b> → <b>Run workflow</b>.
+                <b>The automatic health checks have not run for {ago(newestCheck).replace(' ago', '')}.</b> They should run every 10 minutes. Press <b>Run checks</b> now. If this keeps happening, the outside timer is not set up: see the first item of your to-do list (cron-job.org).
               </div>
             )}
             {entries.length === 0 && <div className={card}>The health checks have not run yet. Press <b>Run checks</b> at the top.</div>}

@@ -1,6 +1,6 @@
 name: Watchdog
 
-# The autopilot. Every ~10 minutes it asks the app to check itself and the free services it relies on, to fix what it can
+# The autopilot. When called it asks the app to check itself and the free services it relies on, to fix what it can
 # (for example, find the AI model names that exist today), and to alert you on your phone / chat webhook. If something
 # important stays down, THIS JOB FAILS — and GitHub then emails you automatically, as a second, independent alarm.
 #
@@ -8,7 +8,7 @@ name: Watchdog
 
 on:
   schedule:
-    - cron: '*/10 * * * *'
+    - cron: '23 */3 * * *' # every 3 hours as a backup; cron-job.org is the main clock (every 10 minutes)
   workflow_dispatch:
 
 jobs:

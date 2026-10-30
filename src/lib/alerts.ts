@@ -4,6 +4,7 @@
 import { addIncident, type Level } from './ops'
 import { allowedEndpoint, pushConfigured, sendTo, subId, type PushSub } from './push'
 import { redis, redisConfigured } from './redis'
+import { webhookInit } from './webhook-format'
 
 const b64url = /^[A-Za-z0-9_-]+={0,2}$/
 
@@ -62,7 +63,8 @@ export async function sendAlert(level: Level, title: string, body: string, opts:
   if (hook) {
     const text = `${ICON[level]} Deen Companion — ${title}\n${body}`
     try {
-      const r = await fetch(hook, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: text, text }), signal: AbortSignal.timeout(5000) })
+      const init = webhookInit(hook, level, title, text)
+      const r = await fetch(hook, { method: 'POST', headers: init.headers, body: init.body, signal: AbortSignal.timeout(5000) })
       out.webhook = r.ok
     } catch {}
   }

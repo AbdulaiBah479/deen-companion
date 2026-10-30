@@ -12,7 +12,7 @@ jobs:
     name: leaked secrets (gitleaks)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with: { fetch-depth: 0 }
       - uses: gitleaks/gitleaks-action@v2
         env:
@@ -23,14 +23,14 @@ jobs:
     continue-on-error: true # findings are for you to read in the log; they should not turn the whole repo red
     container: { image: semgrep/semgrep }
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: semgrep scan --config p/typescript --config p/react --config p/nextjs --error --quiet src
   deps:
     name: known-vulnerable packages (OSV) — advisory
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: google/osv-scanner-action/osv-scanner-action@v2
         with:
           scan-args: --lockfile=package-lock.json

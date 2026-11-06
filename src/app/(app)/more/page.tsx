@@ -35,6 +35,7 @@ const ITEMS = [
   { href: '/mosques', icon: '🕌', title: 'Find a Mosque', desc: 'Nearby, from OpenStreetMap', kids: false },
   { href: '/qibla', icon: '🧭', title: 'Qibla Finder', desc: 'Compass to the Kaaba', kids: false },
   { href: '/zakat', icon: '💰', title: 'Zakat Calculator', desc: 'Live nisab & amount due', kids: false },
+  { href: '/basics', icon: '🧭', title: 'Islam basics', desc: 'Pillars, how to pray, purification, fasting, manners', kids: true },
   { href: '/rituals', icon: '🤲', title: 'Rituals & special prayers', desc: 'Istikharah, rain, eclipse, funeral, Eid and more', kids: false },
   { href: '/ruqyah', icon: '🛡️', title: 'Ruqyah', desc: 'Protection & healing from the Quran and Sunnah', kids: false },
   { href: '/ramadan', icon: '🌙', title: 'Ramadan Tracker', desc: 'Fasting & Quran goals', kids: true },

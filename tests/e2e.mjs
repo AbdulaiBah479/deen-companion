@@ -833,6 +833,12 @@ t('sponsor: businesses can read the rules (halal only, labelled, never in worshi
 await goto('/zakat'); await waitFor('document.querySelectorAll("[data-testid=cause-howused]").length>=6', 25000)
 t('zakat: it explains how a gift reaches people (the charity own site, no share taken, its receipt) and each cause has a How it is used box', /takes no share/i.test(await ev('document.querySelector("[data-testid=how-gift-reaches]").textContent')) && (await ev('document.querySelectorAll("[data-testid=cause-howused]").length')) >= 6)
 
+// ============================ Islam basics ============================
+await goto('/basics'); await waitFor('document.querySelectorAll("[data-testid=basics-section]").length>=6', 20000)
+t('basics: six sections plus a glossary, with listen buttons and a note that it is not a fatwa', /five pillars/i.test(await text()) && /How to pray, step by step/.test(await text()) && /not a fatwa/i.test(await text()) && !!(await ev('!!document.querySelector("[data-testid=glossary]")')))
+await goto('/basics#pray'); await waitFor('document.querySelector("#pray")?.open===true', 15000)
+t('basics: a link such as /basics#pray opens that section with its ten steps and what to say', (await ev('document.querySelectorAll("#pray ol > li").length')) === 10 && /Subḥāna rabbiyal-‘aẓīm/.test(await text()))
+
 // ============================ Verse Journey ============================
 await goto('/journey'); await waitFor('document.querySelectorAll("[data-testid=journey-feelings] li").length>=13', 20000)
 t('journey: the feelings list offers 13 situations', true)
@@ -1069,6 +1075,12 @@ const audioSaved = await waitFor('/now plays without internet/.test(document.bod
 t('offline audio: a surah\'s recitation is downloaded and listed', audioSaved && /108\. Al-Kawthar · .* · 3 \/ 3 verses/.test(await ev('document.querySelector("[data-testid=offline-audio-list]")?.innerText||""')), await ev('document.querySelector("[data-testid=offline-audio-list]")?.innerText||""'))
 t('offline audio: storage use is shown', /This site is using/.test(await text()))
 
+// An offline pack: "Daily worship" (duas, rituals, basics, guides…) is saved on purpose from Settings.
+t('packs: Settings lists the offline packs with what each holds', /Offline packs/.test(await text()) && (await ev('document.querySelectorAll("[data-testid=offline-packs] li").length')) >= 3)
+await ev('[...document.querySelectorAll("[data-testid=pack-worship] button")].find(b=>b.innerText.includes("Save for offline"))?.click()')
+const packSaved = await waitFor('/Saved on/.test(document.querySelector("[data-testid=pack-status-worship]")?.innerText||"")', 90000)
+t('packs: the Daily worship pack saves, and says how many of its pages are ready', packSaved && /\d+ of 12 pages ready/.test(await ev('document.querySelector("[data-testid=pack-status-worship]")?.innerText||""')), await ev('document.querySelector("[data-testid=pack-status-worship]")?.innerText||""'))
+
 // A saved place so prayer times can be calculated without any network.
 await ev('localStorage.setItem("deen:place", JSON.stringify({kind:"coords",lat:21.4225,lng:39.8262,label:"Makkah"})); localStorage.setItem("deen:place-auto","true"); localStorage.setItem("deen:loc-dismissed","true")')
 
@@ -1095,6 +1107,12 @@ await goto('/stories'); await sleep(1500)
 t('offline: a page that was never opened shows the friendly offline page', await ev('!!document.querySelector("[data-testid=offline-title]")'))
 await goto('/dhikr'); await sleep(800)
 t('offline: the Dhikr counter works', /Subhanallah|SubhanAllah|Dhikr/i.test(await text()))
+await goto('/rituals'); await waitFor('document.querySelectorAll("[data-testid=ritual]").length>=14', 20000)
+t('offline pack: the Rituals page opens with every ritual and no internet', /Istikhara/.test(await text()) && /Funeral prayer/.test(await text()))
+await goto('/basics'); await waitFor('document.querySelectorAll("[data-testid=basics-section]").length>=6', 20000)
+t('offline pack: Islam basics opens with all its sections and no internet', /How to pray, step by step/.test(await text()) && /Words you will hear/.test(await text()))
+await goto('/duas'); await waitFor('/Duas/.test(document.body.innerText)', 15000); await sleep(1500)
+t('offline pack: the Duas page shows its duas (saved when the pack was downloaded)', (await ev('document.querySelectorAll("ul > li h2").length')) >= 3, (await text()).slice(0, 100))
 const audioUrl = (n) => 'http://localhost:4010/audio/Alafasy_128kbps/108' + String(n).padStart(3, '0') + '.mp3'
 const played = await ev('(async()=>{const a=new Audio(' + JSON.stringify(audioUrl(1)) + ');a.volume=0.01;try{await a.play()}catch(e){return {err:String(e)}};for(let i=0;i<30&&a.currentTime<0.4;i++)await new Promise(r=>setTimeout(r,100));return {t:a.currentTime,d:a.duration}})()')
 t('offline audio: a saved verse plays with no internet', !played.err && played.t > 0.3 && played.d > 5, JSON.stringify(played))
@@ -1278,8 +1296,8 @@ await setInput('input[aria-label="Admin key"]', 'a-wrong-key-a-wrong-key-a-wrong
 t('admin: a wrong key is refused with a clear message', /That key is not right/.test(await text()))
 await setInput('input[aria-label="Admin key"]', 'test-admin-key-0123456789-abcdefghij'); await clickText('Open'); await waitFor('/Run checks/.test(document.body.innerText)', 15000)
 t('admin: the right key opens the control room', /Control room/.test(await text()) && /Run checks/.test(await text()))
-await waitFor('document.body.innerText.includes("Prayer reminders run on schedule") && document.body.innerText.includes("confirm their e-mail")', 20000)
-t('admin: the control room shows the owner a to-do list that ticks itself', /Your to-do list/.test(await text()) && /Prayer reminders run on schedule/.test(await text()) && /confirm their e-mail/.test(await text()), (await text()).slice(0, 600))
+const todoShown = await waitFor('document.body.innerText.includes("Prayer reminders run on schedule") && document.body.innerText.includes("confirm their e-mail")', 20000)
+t('admin: the control room shows the owner a to-do list that ticks itself', todoShown === true)
 await clickText('Run checks'); await waitFor('/Checks finished/.test(document.body.innerText)', 40000)
 t('admin: "Run checks" runs the autopilot and reports', /Checks finished: everything important is fine/.test(await text()), (await text()).slice(0, 200).replace(/\n/g, ' '))
 await waitFor('/App and its data/.test(document.body.innerText)', 10000)

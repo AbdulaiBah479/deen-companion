@@ -6,6 +6,7 @@ import { InstallCard } from '@/components/InstallApp'
 import LangSelect from '@/components/LangSelect'
 import OfflineAudioManager from '@/components/OfflineAudioManager'
 import OfflineManager from '@/components/OfflineManager'
+import OfflinePacks from '@/components/OfflinePacks'
 import { AR_SIZE, TR_SIZE, usePrefs, type Theme } from '@/lib/prefs'
 import { useStored } from '@/lib/storage'
 import { LOCAL_MODELS, detectWebGPU, isModelCached, loadLocalModel, removeModel, type GpuSupport, type LocalTier } from '@/lib/webllm'
@@ -251,6 +252,10 @@ export default function SettingsPage() {
         <h2 className="font-bold mb-2">Offline</h2>
         <OfflineManager />
         <OfflineAudioManager />
+        <div className="pt-3 mt-3 border-t border-gray-100">
+          <h3 className="font-semibold mb-1">Offline packs</h3>
+          <OfflinePacks />
+        </div>
       </section>
 
       <section className={section}>

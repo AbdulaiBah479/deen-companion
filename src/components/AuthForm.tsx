@@ -13,11 +13,13 @@ export default function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [busy, setBusy] = useState(false)
+  const [needsConfirm, setNeedsConfirm] = useState(false) // signed in before confirming the e-mail: offer to send the link again
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
     setNotice('')
+    setNeedsConfirm(false)
 
     if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
       setError('Accounts are not configured yet. Add your Supabase keys to .env.local.')
@@ -43,11 +45,19 @@ export default function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
         else setNotice('We sent a confirmation link to your e-mail. Open it, then come back and sign in.')
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password })
-        if (error) throw new Error(/not confirmed/i.test(error.message) ? 'Please confirm your e-mail first: open the link we sent you, then sign in.' : error.message)
+        if (error) {
+          if (/not confirmed/i.test(error.message)) {
+            setNeedsConfirm(true)
+            throw new Error('Please confirm your e-mail first: open the link we sent you (check Spam too), then sign in.')
+          }
+          throw error
+        }
         router.push('/dashboard')
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong')
+      const m = err instanceof Error ? err.message : ''
+      // The mail service can fail on our side; say so plainly instead of showing a technical message.
+      setError(/sending (confirmation )?e-?mail|smtp|rate limit|too many/i.test(m) ? 'We could not send your confirmation e-mail just now. Please try again in a few minutes. If it keeps happening, tell us on the Report page.' : m || 'Something went wrong')
     } finally {
       setBusy(false)
     }
@@ -126,6 +136,23 @@ export default function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
 
         {error && <p className="text-sm text-red-600">{error}</p>}
         {notice && <p className="text-sm text-[#0F766E]">{notice}</p>}
+        {needsConfirm && (
+          <button
+            type="button"
+            disabled={busy || !email}
+            onClick={async () => {
+              setBusy(true)
+              setError('')
+              const { error } = await createClient().auth.resend({ type: 'signup', email })
+              setBusy(false)
+              if (error) setError('We could not send it just now. Please try again in a few minutes.')
+              else setNotice('Sent again. Open the newest e-mail (check Spam too).')
+            }}
+            className="w-full py-2 rounded-xl border border-[#0F766E] text-[#0F766E] text-sm font-semibold disabled:opacity-50"
+          >
+            Send the confirmation e-mail again
+          </button>
+        )}
 
         <button
           disabled={busy}

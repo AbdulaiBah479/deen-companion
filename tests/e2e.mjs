@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { HERITAGE } from '../src/lib/heritage.ts'
+import { QURAN_101, KIDS_ISLAM } from '../src/lib/academy-content.ts'
 import { BASICS_LESSONS, TAJWEED_LESSONS, buildLetterLessons, buildWordLessons } from '../src/lib/learn-content.ts'
 
 const EDGE = 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'
@@ -309,7 +310,7 @@ t('ai: story "Explain this passage" passes the verse range', /Quran 12:4/.test(a
 // ---------- NEW: kids mode + settings ----------
 await goto('/more')
 t('more: full menu lists Quran Identifier + Mosque finder', /Quran Identifier/.test(await text()) && /Find a Mosque/.test(await text()))
-await goto('/settings'); await click('input[type=checkbox]'); await sleep(300)
+await goto('/settings'); await ev('[...document.querySelectorAll("label")].find(l=>/Larger text/.test(l.innerText)).querySelector("input").click()'); await sleep(300)
 t('settings: kids mode toggle persists', (await ls('deen:kids')) === 'true')
 t('settings: kids mode enlarges the page', (await ev('document.documentElement.dataset.kids')) === 'true')
 await goto('/more')
@@ -615,6 +616,25 @@ await goto('/learn/letters/letters-1'); await waitFor('/Next →/.test(document.
 t('lesson slide: big Arabic letter with its four written forms', /Alone/.test(await text()) && /(Start of a word|Does not join)/.test(await text()) && (await ev('!!document.querySelector("p[lang=ar]")')))
 await goto('/dashboard'); await waitFor('/streak/i.test(document.body.innerText)', 15000)
 t('home: shows the learning streak', /1 day/.test(await text()))
+
+// ============================ Academy: courses for children and students, with certificates ============================
+await goto('/learn'); await waitFor('/My First Arabic Words/.test(document.body.innerText)', 15000)
+t('academy: the hub groups courses for children and for students and everyone', /For children/.test(await text()) && /For students and everyone/.test(await text()) && (await ev('document.querySelectorAll("[data-testid=course-row]").length')) >= 9)
+const hubTxt = await text()
+t('academy: every Academy course is listed', ['Arabic for Beginners', 'The Life of the Prophet', 'Understanding the Quran', 'My Islam', 'My First Arabic Words'].every((n) => hubTxt.includes(n)))
+await goto('/learn/quran-101'); await waitFor('!!document.querySelector("[data-testid=course-outcomes]")', 15000)
+t('academy: a course page says what you will learn, how long it takes and how far you are', /What you will learn/.test(await text()) && /0 of 5 lessons passed/.test(await text()) && /Start the course/.test(await text()))
+t('academy: no certificate before the course is finished', !(await ev('!!document.querySelector("[data-testid=certificate]")')))
+for (const l of QURAN_101) await doLesson('quran-101', l)
+await goto('/learn/quran-101'); await waitFor('!!document.querySelector("[data-testid=certificate]")', 15000)
+t('academy: passing every lesson unlocks a certificate of completion', /5 of 5 lessons passed/.test(await text()) && /not an accredited qualification/.test(await text()))
+await setInput('input[aria-label="Name on the certificate"]', 'Amina Test'); await sleep(300)
+t('academy: the certificate carries the learner’s name and the course', (await ev('document.querySelector("[data-testid=cert-name]").innerText')) === 'Amina Test' && /Understanding the Quran/.test(await text()))
+await doLesson('kids-islam', KIDS_ISLAM[0])
+await goto('/learn/kids-islam'); await waitFor('/1 of 6 lessons passed/.test(document.body.innerText)', 15000)
+t('academy: a children’s course tracks progress and offers to continue', /1 of 6 lessons passed/.test(await text()) && /Continue/.test(await text()))
+await goto('/learn'); await waitFor('document.body.innerText.includes("1 / 6 lessons")', 10000)
+t('academy: the hub shows each course’s progress and level', (await text()).includes('1 / 6 lessons · Beginner') && (await text()).includes('5 / 5 lessons'))
 
 // ============================ v3: AI status & resilience in the UI ============================
 await goto('/companion'); await waitFor('/Cloud AI ready/.test(document.body.innerText)', 20000)
@@ -941,6 +961,98 @@ const blockedText = await text()
 t('location: tapping "Use my location" while blocked explains how to fix it', /blocked|choose a city/i.test(blockedText), blockedText.replace(/\s+/g, ' ').slice(0, 300))
 await setPerm('granted'); await ev('localStorage.clear()')
 
+// ============================ Make-up tracker, giving, journal, baby names, reading comfort, Qibla ============================
+const typeIn = (sel, v) => ev(`(()=>{const i=document.querySelector(${JSON.stringify(sel)});if(!i)return false;Object.getOwnPropertyDescriptor(Object.getPrototypeOf(i),"value").set.call(i,${JSON.stringify(v)});i.dispatchEvent(new Event("input",{bubbles:true}));return true})()`)
+await goto('/qada'); await ev('localStorage.removeItem("deen:qada")'); await goto('/qada'); await waitFor('!!document.querySelector("[data-testid=qada-total]")', 15000)
+t('qada: starts at zero with a note that it is a counter, not a ruling', (await ev('document.querySelector("[data-testid=qada-total]").innerText')) === '0' && /not a ruling/i.test(await text()))
+await clickText('Set or estimate what I owe', 'summary'); await sleep(200)
+await typeIn('details input[placeholder="e.g. 3"]', '1'); await typeIn('details input[placeholder="e.g. 12"]', '4'); await clickText('Save estimate'); await sleep(400)
+t('qada: one year estimated = 365 of each of five prayers, and 4 fasts', (await ev('document.querySelector("[data-testid=qada-total]").innerText')) === '1825' && (await ev('document.querySelector("[data-testid=qada-fasts]").innerText')) === '4')
+await clickText('Made up ✓'); await sleep(300)
+t('qada: ticking one off counts down and starts a streak', (await ev('document.querySelector("[data-testid=qada-total]").innerText')) === '1824' && (await ev('document.querySelector("[data-testid=qada-fajr]").innerText')) === '364' && (await ev('document.querySelector("[data-testid=qada-streak]").innerText')) === '1')
+await goto('/qada'); await waitFor('document.querySelector("[data-testid=qada-total]")?.innerText==="1824"', 10000)
+t('qada: it is still there after reloading', (await ev('document.querySelector("[data-testid=qada-total]").innerText')) === '1824')
+await clickText('Made up ✓'); await sleep(200); await clickText('Undo the last tick'); await sleep(300)
+t('qada: undo puts the last one back', (await ev('document.querySelector("[data-testid=qada-total]").innerText')) === '1824')
+
+await goto('/giving'); await waitFor('!!document.querySelector("input[aria-label=\'Price per kg\']")', 15000)
+t('giving: nothing is shown until a price is typed', !(await ev('!!document.querySelector("[data-testid=fitr-out]")')))
+await typeIn('input[aria-label="Price per kg"]', '10'); await typeIn('input[aria-label="Number of people"]', '4'); await sleep(200)
+t('giving: zakat al-Fitr for 4 people at 10 per kg is 100', /^100\b/.test(await ev('document.querySelector("[data-testid=fitr-out]")?.innerText||""')))
+await typeIn('input[aria-label="Days of fidya"]', '10'); await typeIn('input[aria-label="Cost of one meal"]', '5'); await sleep(200)
+t('giving: fidya for 10 days at 5 per meal is 100; oath kaffarah 50; fasting kaffarah 300', /^100\b/.test(await ev('document.querySelector("[data-testid=fidya-out]")?.innerText||""')) && /^50\b/.test(await ev('document.querySelector("[data-testid=oath-out]")?.innerText||""')) && /^300\b/.test(await ev('document.querySelector("[data-testid=fast-out]")?.innerText||""')))
+t('giving: says it is not a fatwa', /not a fatwa/i.test(await text()))
+
+await goto('/journal'); await ev('localStorage.removeItem("deen:journal")'); await goto('/journal'); await waitFor('!!document.querySelector("[data-testid=journal-empty]")', 15000)
+await typeIn('textarea[aria-label="My reflection"]', 'Ayat al-Kursi gave me calm today'); await typeIn('input[aria-label="What is this about"]', '2:255'); await clickText('Save'); await sleep(400)
+t('journal: a reflection is saved and shown with what it is about', (await ev('document.querySelectorAll("[data-testid=journal-entry]").length')) === 1 && /2:255/.test(await text()) && /gave me calm/.test(await text()))
+await goto('/journal'); await waitFor('document.querySelectorAll("[data-testid=journal-entry]").length===1', 10000)
+t('journal: it is still there after reloading', (await ev('document.querySelectorAll("[data-testid=journal-entry]").length')) === 1)
+await typeIn('input[aria-label="Search my reflections"]', 'zzzz'); await sleep(200)
+t('journal: searching for something absent shows none', (await ev('document.querySelectorAll("[data-testid=journal-entry]").length')) === 0)
+await typeIn('input[aria-label="Search my reflections"]', 'calm'); await sleep(200)
+t('journal: searching finds it', (await ev('document.querySelectorAll("[data-testid=journal-entry]").length')) === 1)
+await ev('window.confirm=()=>true'); await clickText('Delete'); await sleep(300)
+t('journal: deleting removes it', (await ev('document.querySelectorAll("[data-testid=journal-entry]").length')) === 0)
+
+await goto('/baby-names'); await waitFor('document.querySelectorAll("[data-testid=baby-name]").length>=60', 15000)
+t('baby names: a long list with Arabic, meanings and a note', /Commonly:/.test(await text()) && /محمد/.test(await text()))
+await typeIn('input[aria-label="Search names"]', 'light'); await sleep(200)
+t('baby names: searching by meaning finds Noor', /Noor/.test(await text()))
+await typeIn('input[aria-label="Search names"]', 'مريم'); await sleep(200)
+t('baby names: searching in Arabic finds Maryam', /Maryam/.test(await text()))
+await typeIn('input[aria-label="Search names"]', ''); await clickText('Girls'); await sleep(200)
+t('baby names: the girls filter hides boys', !/\bBoy\b/.test(await ev('[...document.querySelectorAll("[data-testid=baby-name]")].map(e=>e.innerText).join(" ")')))
+
+await goto('/settings'); await waitFor('!!document.querySelector("[data-testid=reading-comfort]")', 15000)
+await clickText('130%'); await sleep(300)
+t('reading comfort: choosing 130% enlarges the whole app', (await ev('document.documentElement.getAttribute("data-scale")')) === '130' && parseFloat(await ev('getComputedStyle(document.documentElement).fontSize')) > 20)
+await goto('/dashboard'); await sleep(500)
+t('reading comfort: it is applied on other pages straight away', (await ev('document.documentElement.getAttribute("data-scale")')) === '130')
+await goto('/settings'); await waitFor('!!document.querySelector("[data-testid=reading-comfort]")', 15000)
+await clickText('Normal'); await sleep(200)
+await ev('(()=>{const c=[...document.querySelectorAll("[data-testid=reading-comfort] input")];c.forEach(i=>{if(!i.checked)i.click()})})()'); await sleep(300)
+t('reading comfort: high contrast, plain font and calm motion switch on', (await ev('document.documentElement.getAttribute("data-contrast")')) === 'high' && (await ev('document.documentElement.getAttribute("data-font")')) === 'plain' && (await ev('document.documentElement.getAttribute("data-calm")')) === 'on')
+await ev('localStorage.removeItem("deen:a11y")'); await goto('/dashboard')
+
+// Qibla finds you by itself: allowed -> from the device; blocked -> asks for a city, with a clear reason.
+await setPerm('granted'); await ev('localStorage.removeItem("deen:place");localStorage.removeItem("deen:coords")'); await goto('/qibla')
+await waitFor('!!document.querySelector("[data-testid=qibla-place]")', 20000)
+const qb = parseInt(await ev('(document.body.innerText.match(/(\\d+)°/)||[])[1]||0'), 10)
+t('qibla: with location allowed it finds you by itself, no tap needed', /from your device/.test(await text()) && qb > 105 && qb < 130, `${qb}`)
+await setPerm('denied'); await ev('localStorage.removeItem("deen:place");localStorage.removeItem("deen:coords")'); await goto('/qibla')
+await waitFor('/blocked/i.test(document.body.innerText)', 15000)
+t('qibla: when location is blocked and nothing else is known, it says why and never asks you to type', /blocked/i.test(await text()) && !(await ev('!!document.querySelector("input")')))
+await ev('localStorage.setItem("deen:place", JSON.stringify({kind:"city",city:"Cairo",country:"Egypt",geo:{lat:30.044,lng:31.236,tz:"Africa/Cairo"}}))'); await goto('/qibla')
+await waitFor('!!document.querySelector("[data-testid=qibla-place]")', 15000)
+const qc = parseInt(await ev('(document.body.innerText.match(/(\\d+)°/)||[])[1]||0'), 10)
+t('qibla: blocked but a city is saved: it uses that city (Cairo is about 136°)', /Cairo/.test(await text()) && qc > 130 && qc < 142, `${qc}`)
+await setPerm('granted'); await ev('localStorage.removeItem("deen:place");localStorage.removeItem("deen:coords")')
+
+await goto('/rituals#istikhara'); await waitFor('document.querySelector("#istikhara")?.open===true && document.querySelectorAll("#istikhara [data-testid=recitation]").length>=3', 20000)
+t('rituals: istikhara shows the dua in Arabic with its pronunciation and meaning, in order', /أَسْتَخِيرُكَ بِعِلْمِكَ/.test(await text()) && /astakhīruka bi‘ilmika/.test(await text()) && /Knower of the unseen/.test(await text()) && /What to say, in order/.test(await text()))
+await goto('/rituals#janazah'); await waitFor('document.querySelector("#janazah")?.open===true && document.querySelectorAll("#janazah [data-testid=recitation]").length>=6', 20000)
+t('rituals: the funeral prayer shows Fatihah, the blessings, the dua for the deceased, and the salam', /Al-ḥamdu lillāhi rabbil-‘ālamīn/.test(await text()) && /وَاغْسِلْهُ بِالْمَاءِ وَالثَّلْجِ وَالْبَرَدِ/.test(await text()) && /Allāhummaghfir lahu/.test(await text()))
+await goto('/rituals#hajj-words'); await waitFor('document.querySelector("#hajj-words")?.open===true', 20000)
+t('rituals: Hajj and Umrah words include the talbiyah in Arabic', /لَبَّيْكَ اللَّهُمَّ لَبَّيْكَ/.test(await text()))
+await goto('/basics#pray'); await waitFor('document.querySelector("#pray")?.open===true && document.querySelectorAll("#pray [data-testid=recitation]").length>=8', 20000)
+t('basics: how to pray shows what to say at every step, in Arabic', /سُبْحَانَ رَبِّيَ الْعَظِيمِ/.test(await text()) && /سُبْحَانَ رَبِّيَ الْأَعْلَىٰ/.test(await text()) && /التَّحِيَّاتُ لِلَّهِ/.test(await text()) && /السَّلَامُ عَلَيْكُمْ وَرَحْمَةُ اللَّهِ/.test(await text()))
+
+await goto('/halal'); await waitFor('document.querySelectorAll("[data-testid=halal-item]").length>=40', 15000)
+t('halal: a long guide that says it is not a fatwa', /not a fatwa/i.test(await text()))
+await typeIn('input[aria-label="Search ingredients"]', 'E471'); await sleep(200)
+t('halal: an E-number finds its entry and tells you to check the source', (await ev('document.querySelectorAll("[data-testid=halal-item]").length')) === 1 && /Check the source/.test(await text()))
+await typeIn('input[aria-label="Search ingredients"]', 'zzzz'); await sleep(200)
+t('halal: an unknown ingredient gets honest advice, not a guess', !!(await ev('!!document.querySelector("[data-testid=halal-none]")')))
+
+await goto('/converter'); await waitFor('!!document.querySelector("[data-testid=to-hijri]")', 15000)
+await typeIn('input[aria-label="Gregorian date"]', '2026-03-20'); await sleep(300)
+t('converter: 20 March 2026 is in Ramadan or Shawwal 1447', /(Ramadan|Shawwal) 1447/.test(await ev('document.querySelector("[data-testid=to-hijri]")?.innerText||""')), await ev('document.querySelector("[data-testid=to-hijri]")?.innerText||""'))
+t('converter: Hijri to Gregorian shows a date', (await ev('document.querySelector("[data-testid=to-gregorian]")?.innerText||""')).length > 8)
+
+await goto('/settings'); await waitFor('!!document.querySelector("[data-testid=audio-plans]")', 20000)
+t('offline quran: the whole Quran, Juz Amma and the essentials can each be downloaded in one tap', (await ev('document.querySelectorAll("[data-testid=audio-plans] button").length')) === 3 && /The whole Quran/.test(await text()) && /Juz Amma/.test(await text()))
+
 // ============================ v5: more stories + Library ============================
 await ev('localStorage.clear()')
 await goto('/stories'); await waitFor('document.querySelectorAll("a[href^=\'/stories/\']").length>=40', 15000)
@@ -1062,7 +1174,7 @@ t('offline: Settings → Offline starts with nothing saved', /Nothing saved yet/
 await clickText('Download the Quran for offline')
 const saved = await waitFor('/whole Quran is saved/.test(document.body.innerText)', 150000)
 t('offline: the whole Quran downloads and is reported as saved', saved, (await ev('document.querySelector("[data-testid=offline-status]")?.innerText')))
-const cached = await ev('caches.open("deen-v3").then(c=>c.keys()).then(k=>({api:k.filter(x=>x.url.includes("/api/quran/surah/")).length,pages:k.filter(x=>/\\/quran\\/\\d+$/.test(new URL(x.url).pathname)).length,shell:k.some(x=>x.url.endsWith("/offline"))}))')
+const cached = await ev('caches.open("deen-v4").then(c=>c.keys()).then(k=>({api:k.filter(x=>x.url.includes("/api/quran/surah/")).length,pages:k.filter(x=>/\\/quran\\/\\d+$/.test(new URL(x.url).pathname)).length,shell:k.some(x=>x.url.endsWith("/offline"))}))')
 t('offline: 114 surahs of text and 114 pages are in the cache, plus the offline page', cached.api === 114 && cached.pages >= 114 && cached.shell, JSON.stringify(cached))
 
 // Recitation for offline listening (the fake server provides a short generated clip for every verse).
@@ -1079,7 +1191,7 @@ t('offline audio: storage use is shown', /This site is using/.test(await text())
 t('packs: Settings lists the offline packs with what each holds', /Offline packs/.test(await text()) && (await ev('document.querySelectorAll("[data-testid=offline-packs] li").length')) >= 3)
 await ev('[...document.querySelectorAll("[data-testid=pack-worship] button")].find(b=>b.innerText.includes("Save for offline"))?.click()')
 const packSaved = await waitFor('/Saved on/.test(document.querySelector("[data-testid=pack-status-worship]")?.innerText||"")', 90000)
-t('packs: the Daily worship pack saves, and says how many of its pages are ready', packSaved && /\d+ of 12 pages ready/.test(await ev('document.querySelector("[data-testid=pack-status-worship]")?.innerText||""')), await ev('document.querySelector("[data-testid=pack-status-worship]")?.innerText||""'))
+t('packs: the Daily worship pack saves, and says how many of its pages are ready', packSaved && /\d+ of \d+ pages ready/.test(await ev('document.querySelector("[data-testid=pack-status-worship]")?.innerText||""')), await ev('document.querySelector("[data-testid=pack-status-worship]")?.innerText||""'))
 
 // A saved place so prayer times can be calculated without any network.
 await ev('localStorage.setItem("deen:place", JSON.stringify({kind:"coords",lat:21.4225,lng:39.8262,label:"Makkah"})); localStorage.setItem("deen:place-auto","true"); localStorage.setItem("deen:loc-dismissed","true")')
@@ -1296,6 +1408,7 @@ await setInput('input[aria-label="Admin key"]', 'a-wrong-key-a-wrong-key-a-wrong
 t('admin: a wrong key is refused with a clear message', /That key is not right/.test(await text()))
 await setInput('input[aria-label="Admin key"]', 'test-admin-key-0123456789-abcdefghij'); await clickText('Open'); await waitFor('/Run checks/.test(document.body.innerText)', 15000)
 t('admin: the right key opens the control room', /Control room/.test(await text()) && /Run checks/.test(await text()))
+await waitFor('/Your to-do list|Show everything/.test(document.body.innerText)', 15000); await clickText('Show everything'); await sleep(300)
 const todoShown = await waitFor('document.body.innerText.includes("Prayer reminders run on schedule") && document.body.innerText.includes("confirm their e-mail")', 20000)
 t('admin: the control room shows the owner a to-do list that ticks itself', todoShown === true)
 await clickText('Run checks'); await waitFor('/Checks finished/.test(document.body.innerText)', 40000)

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAudio } from '@/lib/audio'
-import { audioSupported, estimateBytes, formatMB, removeSurahAudio, saveSurahAudio, savedAudio, storageUsage, type SavedSurah } from '@/lib/offline-audio'
+import { AUDIO_PLANS, audioSupported, estimateBytes, planBytes, formatMB, removeSurahAudio, saveSurahAudio, savedAudio, storageUsage, type SavedSurah } from '@/lib/offline-audio'
 import { RECITERS } from '@/lib/quran'
 
 type S = { id: number; name_simple: string; verses_count: number }
@@ -65,12 +65,54 @@ export default function OfflineAudioManager() {
     )
   }
 
+  async function savePlan(planId: string) {
+    const plan = AUDIO_PLANS.find((p) => p.id === planId)
+    if (!plan || !surahs.length) return
+    const bytes = planBytes(plan, countOf, reciter)
+    if (!window.confirm(`${plan.name} for ${reciterName} is about ${formatMB(bytes)}. Save it on this device? You can stop any time and continue later.`)) return
+    setBusy(true)
+    setNote('')
+    abort.current = new AbortController()
+    let done = 0
+    let failed = 0
+    let full = false
+    const total = plan.surahs.reduce((n, id) => n + countOf(id), 0)
+    for (const id of plan.surahs) {
+      if (abort.current.signal.aborted || full) break
+      const base = done
+      const r = await saveSurahAudio(id, countOf(id), reciter, (d) => setProgress([base + d, total]), abort.current.signal)
+      done += countOf(id)
+      failed += r.failed
+      full = r.full
+    }
+    setBusy(false)
+    await refresh()
+    setNote(
+      abort.current.signal.aborted
+        ? 'Stopped. What was saved stays available; start again to continue.'
+        : full
+          ? 'Your device is out of space for more audio. Remove something and start again to continue.'
+          : failed
+            ? `Finished, but ${failed} verses could not be downloaded. Start it again to fetch them.`
+            : `Done — ${plan.name} (${reciterName}) now plays without internet.`
+    )
+  }
+
   return (
     <div className="text-sm text-gray-700 space-y-2 mt-4" data-testid="offline-audio">
       <h3 className="font-semibold">Recitation without internet</h3>
       <p>
         Save a surah’s audio for <b>{reciterName}</b> (change the reciter in the audio player). It plays and skips around just like online.
       </p>
+      <div className="grid gap-2" data-testid="audio-plans">
+        {AUDIO_PLANS.map((p) => (
+          <button key={p.id} type="button" disabled={busy || !surahs.length} onClick={() => void savePlan(p.id)} className="text-left rounded-xl border border-[#0F766E] px-3 py-2 disabled:opacity-50">
+            <span className="font-semibold text-[#0F766E]">⬇ {p.name}</span>
+            <span className="block text-xs text-gray-600">{p.blurb}{surahs.length ? ` About ${formatMB(planBytes(p, countOf, reciter))}.` : ''}</span>
+          </button>
+        ))}
+      </div>
+      <p className="text-xs text-gray-500">Or pick one surah:</p>
       <div className="flex flex-wrap gap-2 items-center">
         <select value={pick} onChange={(e) => setPick(Number(e.target.value))} disabled={busy} aria-label="Surah to save" className="px-3 py-2 rounded-lg border border-gray-300 bg-white">
           {(surahs.length ? surahs : [{ id: 108, name_simple: 'Al-Kawthar', verses_count: 3 }]).map((x) => (

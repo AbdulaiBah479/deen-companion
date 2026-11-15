@@ -85,7 +85,7 @@ ok('the server cannot be tricked into calling internal addresses (SSRF via push 
 const adminApi = await get('/api/admin/overview')
 ok('private API replies are never cacheable', /no-store/.test(adminApi.headers.get('cache-control') || '') || adminApi.status === 401)
 const sw = await (await get('/sw.js')).text()
-ok('the offline cache never keeps private pages (admin, scheduler, reports, reminders, AI)', sw.includes('PRIVATE(url.pathname)') && sw.includes('(admin|cron|push|report|ai)'))
+ok('the offline cache never keeps private pages (admin, scheduler, reports, reminders, AI)', sw.includes('PRIVATE(url.pathname)') && sw.includes('(admin|cron|push|report|ai|where)'))
 const robots = await (await get('/robots.txt')).text()
 ok('search engines are told to stay out of /api and /admin', /Disallow: \/api\//.test(robots) && /Disallow: \/admin/.test(robots))
 const admin = await (await get('/admin')).text()

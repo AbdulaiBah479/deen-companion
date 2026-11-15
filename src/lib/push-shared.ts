@@ -7,6 +7,8 @@ export const LEADS = [0, 5, 10, 15, 30] // minutes before the prayer
 export const EXTRAS = [
   { id: 'adhkar-morning', label: 'Morning adhkar (after Fajr)' },
   { id: 'adhkar-evening', label: 'Evening adhkar (after Asr)' },
+  { id: 'daily-ayah', label: 'A verse of the Quran each morning' },
+  { id: 'daily-hadith', label: 'A hadith each afternoon' },
   { id: 'kahf', label: 'Friday: Surat al-Kahf' },
   { id: 'khutbah-topic', label: 'Thursday evening: a suggested topic for tomorrow’s Friday sermon' },
   { id: 'fast-mon-thu', label: 'Fasting Monday & Thursday (evening before)' },

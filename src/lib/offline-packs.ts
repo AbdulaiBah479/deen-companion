@@ -4,6 +4,11 @@
 // Pages cannot be loaded in a hidden frame (the app forbids being framed, for safety), so the page's own script and style files are
 // found in its HTML and fetched directly.
 
+import { ACADEMY_LESSONS } from './academy-content'
+
+// Every Academy course page and every one of its lessons, so a course can be studied with no internet.
+const ACADEMY_PAGES = Object.entries(ACADEMY_LESSONS).flatMap(([course, ls]) => [`/learn/${course}`, ...ls.map((l) => `/learn/${course}/${l.id}`)])
+
 export type Pack = { id: string; name: string; blurb: string; approx: string; pages: string[]; data: string[]; hadithBooks?: string[] }
 
 const DUAS = ['morning-dhikr', 'evening-dhikr', 'dhikr-after-salah', 'daily-dua', 'selected-dua'].map((c) => `/api/duas?category=${c}`)
@@ -14,7 +19,7 @@ export const PACKS: Pack[] = [
     name: 'Daily worship',
     blurb: 'Duas and adhkar, dhikr counter, 99 Names, prayer times and Qibla, rituals, Islam basics, Hajj and Umrah guides, Ruqyah, calendar, zakat and Ramadan.',
     approx: 'about 3 MB',
-    pages: ['/duas', '/dhikr', '/names', '/prayer', '/qibla', '/rituals', '/basics', '/guides', '/ruqyah', '/calendar', '/zakat', '/ramadan'],
+    pages: ['/duas', '/dhikr', '/names', '/prayer', '/qibla', '/rituals', '/basics', '/guides', '/ruqyah', '/calendar', '/zakat', '/ramadan', '/qada', '/journal', '/giving', '/baby-names', '/halal', '/converter'],
     data: [...DUAS, '/api/names'],
   },
   {
@@ -29,9 +34,9 @@ export const PACKS: Pack[] = [
   {
     id: 'learn',
     name: 'Learn and practise',
-    blurb: 'Quran lessons, Hifz, flashcards, quizzes and games, and the stories of the Quran.',
-    approx: 'about 2 MB',
-    pages: ['/learn', '/hifz', '/flashcards', '/quiz', '/games', '/stories'],
+    blurb: 'The Academy courses (children’s Arabic and Islam, Arabic for beginners, the life of the Prophet, understanding the Quran), Quran lessons, Hifz, flashcards, quizzes and games, and the stories of the Quran.',
+    approx: 'about 6 MB',
+    pages: ['/learn', '/hifz', '/flashcards', '/quiz', '/games', '/stories', ...ACADEMY_PAGES],
     data: [],
   },
 ]

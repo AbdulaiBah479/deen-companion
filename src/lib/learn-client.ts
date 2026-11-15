@@ -1,17 +1,18 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { STATIC_LESSONS, buildLetterLessons, buildWordLessons, type Lesson } from './learn-content'
+import { STATIC_ALL } from './courses'
+import { buildLetterLessons, buildWordLessons, type Lesson } from './learn-content'
 
 // Lessons for a course. Letters and static courses are instant; the Quran-words course loads its frequency data.
 export function useLessons(pathId: string) {
-  const [lessons, setLessons] = useState<Lesson[]>(() => (pathId === 'letters' ? buildLetterLessons() : STATIC_LESSONS[pathId] ?? []))
+  const [lessons, setLessons] = useState<Lesson[]>(() => (pathId === 'letters' ? buildLetterLessons() : STATIC_ALL[pathId] ?? []))
   const [loading, setLoading] = useState(pathId === 'words')
   const [error, setError] = useState('')
 
   useEffect(() => {
     if (pathId !== 'words') {
-      setLessons(pathId === 'letters' ? buildLetterLessons() : STATIC_LESSONS[pathId] ?? [])
+      setLessons(pathId === 'letters' ? buildLetterLessons() : STATIC_ALL[pathId] ?? [])
       setLoading(false)
       return
     }

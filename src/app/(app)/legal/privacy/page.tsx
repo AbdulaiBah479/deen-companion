@@ -76,7 +76,7 @@ export default function PrivacyPage() {
           provider, Supabase (in Frankfurt), protected so that only you can read your rows. Your password is kept only in a scrambled, one-way form that nobody —
           including us — can read. Sign-up does not currently ask you to confirm your email, so use an address you control. You can delete your account and its
           online data yourself at any time: Settings → Account &amp; sync → “Delete my account”{contact ? ` (or write to ${contact})` : ''}. What is saved on your phone
-          stays on your phone until you clear it.
+          stays on your phone until you clear it. If you sign in, personal notes such as your reflection journal and make-up prayer counts sync with your account like your other progress, so write nothing in the journal you would not want stored there.
         </li>
         <li>
           <strong>Reports you send.</strong> If you use “Report a problem”, we keep what you write, the page you sent it from, and the contact detail only if you

@@ -3,16 +3,8 @@
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { EMPTY_LEARN, levelOf, liveStreak, pathProgress, type LearnState } from '@/lib/learn'
-import { PATHS, STATIC_LESSONS, buildLetterLessons } from '@/lib/learn-content'
+import { COURSES, lessonIds, type Course } from '@/lib/courses'
 import { localDateKey, useStored } from '@/lib/storage'
-
-// Lesson counts known without loading data (the words course is 10 words per lesson; its length comes from the data).
-const COUNTS: Record<string, number> = {
-  letters: buildLetterLessons().length,
-  tajweed: STATIC_LESSONS.tajweed.length,
-  basics: STATIC_LESSONS.basics.length,
-  words: 40,
-}
 
 export default function LearnHub() {
   const [state] = useStored<LearnState>('deen:learn', EMPTY_LEARN)
@@ -45,35 +37,44 @@ export default function LearnHub() {
         <div className="h-full bg-[#D4AF37]" style={{ width: `${(lv.into / lv.needed) * 100}%` }} />
       </div>
 
-      <ul className="space-y-3">
-        {PATHS.map((p) => {
-          const ids = Array.from({ length: COUNTS[p.id] }, (_, i) => (p.id === 'tajweed' || p.id === 'basics' ? STATIC_LESSONS[p.id][i].id : `${p.id}-${i + 1}`))
-          const done = pathProgress(state, ids)
-          return (
-            <li key={p.id}>
-              <Link href={`/learn/${p.id}`} className="flex items-center gap-4 bg-white border border-gray-200 rounded-2xl p-4 hover:border-[#0F766E]">
-                <span className="w-14 h-14 rounded-2xl flex items-center justify-center text-3xl text-white shrink-0" style={{ background: p.color }} lang={p.id === 'letters' ? 'ar' : undefined}>
-                  {p.icon}
-                </span>
-                <span className="flex-1 min-w-0">
-                  <span className="block font-bold">{p.title}</span>
-                  <span className="block text-sm text-gray-500">{p.blurb}</span>
-                  <span className="block mt-2 h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                    <span className="block h-full" style={{ width: `${(done / ids.length) * 100}%`, background: p.color }} />
-                  </span>
-                  <span className="block text-xs text-gray-500 mt-1">
-                    {done} / {ids.length} lessons
-                  </span>
-                </span>
-              </Link>
-            </li>
-          )
-        })}
-      </ul>
+      {([['kids', '🧒 For children', 'Short, playful lessons for ages 5 to 10, with a parent or teacher.'], ['everyone', '🎓 For students and everyone', 'Courses for teens and adults, from first letters to the life of the Prophet ﷺ.']] as const).map(([aud, heading, sub]) => (
+        <section key={aud} className="mb-6" aria-label={heading}>
+          <h2 className="font-bold text-lg">{heading}</h2>
+          <p className="text-xs text-gray-500 mb-2">{sub}</p>
+          <ul className="space-y-3">
+            {COURSES.filter((p) => p.info.audience === aud).map((p) => <CourseRow key={p.id} p={p} state={state} />)}
+          </ul>
+        </section>
+      ))}
 
       <p className="text-xs text-gray-500 mt-6">
         These lessons are study aids. For tajweed and prayer, learn with a qualified teacher — rules and details can differ between recitations and schools.
       </p>
     </div>
+  )
+}
+
+function CourseRow({ p, state }: { p: Course; state: LearnState }) {
+  const ids = lessonIds(p.id)
+  const done = pathProgress(state, ids)
+  const finished = ids.length > 0 && done === ids.length
+  return (
+    <li>
+      <Link href={`/learn/${p.id}`} className="flex items-center gap-4 bg-white border border-gray-200 rounded-2xl p-4 hover:border-[#0F766E]" data-testid="course-row">
+        <span className="w-14 h-14 rounded-2xl flex items-center justify-center text-3xl text-white shrink-0" style={{ background: p.color }} lang={p.id === 'letters' ? 'ar' : undefined}>
+          {p.icon}
+        </span>
+        <span className="flex-1 min-w-0">
+          <span className="block font-bold">{p.title}{finished ? ' ✅' : ''}</span>
+          <span className="block text-sm text-gray-500">{p.blurb}</span>
+          <span className="block mt-2 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+            <span className="block h-full" style={{ width: `${ids.length ? (done / ids.length) * 100 : 0}%`, background: p.color }} />
+          </span>
+          <span className="block text-xs text-gray-500 mt-1">
+            {done} / {ids.length} lessons · {p.info.level}
+          </span>
+        </span>
+      </Link>
+    </li>
   )
 }

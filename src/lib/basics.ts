@@ -138,3 +138,23 @@ export const GLOSSARY: { term: string; ar: string; meaning: string }[] = [
   { term: 'Taqwa', ar: 'تقوى', meaning: 'Awareness of Allah that keeps a person from what He dislikes and moves him toward what He loves.' },
   { term: 'Fatwa', ar: 'فتوى', meaning: 'A ruling given by a qualified scholar to a specific question. This app gives learning material, not fatwas.' },
 ]
+
+// The exact words for the steps of the prayer (by step number in the "pray" section) and for other sections, as ids in recitations.ts
+// or "quran:<passage>". They are shown under each step, in Arabic with a transliteration and the meaning.
+export const STEP_WORDS: Record<string, Record<number, string[]>> = {
+  pray: {
+    1: ['takbir', 'istiftah'],
+    2: ['istiadha', 'quran:fatiha', 'quran:ikhlas'],
+    3: ['ruku'],
+    4: ['rising'],
+    5: ['sujud'],
+    6: ['between-sujud'],
+    8: ['tashahhud', 'salawat', 'refuge-before-salam'],
+    9: ['salam'],
+  },
+}
+export const SECTION_WORDS: Record<string, string[]> = {
+  pillars: ['shahadah'],
+  fasting: ['niyyah-fast', 'iftar', 'laylat-qadr'],
+  adab: ['toilet-enter', 'toilet-leave', 'eat-start', 'eat-end', 'sleep', 'wake'],
+}

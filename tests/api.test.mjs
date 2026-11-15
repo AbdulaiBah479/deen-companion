@@ -209,8 +209,14 @@ ok('validation: oversize message -> 400', (await askPatient('a'.repeat(2500))).s
   const off = await get('/offline')
   ok('the offline fallback page exists', off.status === 200 && (await off.text()).includes("You’re offline"))
   const sw = await (await get('/sw.js')).text()
-  ok('service worker is the v3 offline-capable one', sw.includes("'deen-v3'") && sw.includes("caches.match('/offline')"))
-  ok('service worker never saves private pages (admin, scheduler, reports, reminders, AI) on a device', sw.includes('const PRIVATE') && sw.includes('PRIVATE(url.pathname)') && sw.includes('(admin|cron|push|report|ai)'))
+  const w0 = await get('/api/where')
+  ok('/api/where without network position headers says unknown, uncached', w0.status === 404 && /no-store/.test(w0.headers.get('cache-control') || ''))
+  const w1 = await fetch(APP + '/api/where', { headers: { 'x-vercel-ip-latitude': '8.4657', 'x-vercel-ip-longitude': '-13.2317', 'x-vercel-ip-city': 'Freetown', 'x-vercel-ip-country': 'SL' } })
+  const w1j = await w1.json()
+  ok('/api/where gives a rounded, named position (about 10 km) from the headers', w1.status === 200 && w1j.lat === 8.5 && w1j.lng === -13.2 && w1j.name === 'Freetown, SL', JSON.stringify(w1j))
+  ok('service worker never caches the position lookup', sw.includes('where)'))
+  ok('service worker is the v4 offline-capable one', sw.includes("'deen-v4'") && sw.includes("caches.match('/offline')"))
+  ok('service worker never saves private pages (admin, scheduler, reports, reminders, AI) on a device', sw.includes('const PRIVATE') && sw.includes('PRIVATE(url.pathname)') && sw.includes('(admin|cron|push|report|ai|where)'))
   ok('security.txt is published', (await get('/.well-known/security.txt')).status === 200)
 }
 

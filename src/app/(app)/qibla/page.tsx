@@ -1,14 +1,14 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { errorMessage, getPosition, permissionState } from '@/lib/location'
+import { coordsFromPlace, errorMessage, getPosition, permissionState, placeInfo, readSaved, type Coords } from '@/lib/location'
 import { HeadingFilter, compassHeading, distanceToKaaba, qiblaBearing, turnBetween, unwrap } from '@/lib/qibla'
 import { useStored } from '@/lib/storage'
 
 type OrientationEventWithCompass = DeviceOrientationEvent & { webkitCompassHeading?: number; webkitCompassAccuracy?: number }
 
 export default function QiblaPage() {
-  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null)
+  const [coords, setCoords] = useState<Coords | null>(null)
   const [error, setError] = useState('')
   const [heading, setHeading] = useState<number | null>(null)
   const [compassOn, setCompassOn] = useState(false)
@@ -16,24 +16,86 @@ export default function QiblaPage() {
   const [offset, setOffset] = useStored<number>('deen:qibla-offset', 0) // your own nudge if your phone's compass reads off
   const handlerRef = useRef<((e: Event) => void) | null>(null)
 
-  const [place, , placeReady] = useStored<{ kind: string; lat?: number; lng?: number } | null>('deen:place', null)
+  const [place, , placeReady] = useStored<unknown>('deen:place', null)
+  const [label, setLabel] = useState('')
+  const [source, setSource] = useState<'device' | 'saved' | 'network' | ''>('')
+  const [finding, setFinding] = useState(false)
 
+  const remember = (c: Coords, name: string) => {
+    try {
+      localStorage.setItem('deen:coords', JSON.stringify({ lat: c.lat, lng: c.lng, name }))
+    } catch {}
+  }
+
+  // Finds where you are from the device. Used automatically on opening and by the button.
   async function locate() {
     setError('')
+    setFinding(true)
     try {
-      setCoords(await getPosition({ highAccuracy: true }))
+      const c = await getPosition({ highAccuracy: true })
+      setCoords(c)
+      haveRef.current = true
+      setNote('')
+      setSource('device')
+      const info = await placeInfo(c)
+      setLabel(info.name)
+      remember(c, info.name)
     } catch (e) {
-      setError(errorMessage(e))
+      if (e === 'denied') setDenied(true)
+      // No typing: keep what is known, otherwise fall back to the network's rough position.
+      if (!haveRef.current && !(await fromNetwork())) setError(errorMessage(e))
+      else if (e === 'denied') setNote('Location is blocked for this site, so this uses a saved or approximate place. Allow location in your browser settings for the exact direction.')
+    } finally {
+      setFinding(false)
+    }
+  }
+  const [denied, setDenied] = useState(false)
+  const [note, setNote] = useState('')
+  const haveRef = useRef(false)
+
+  // Last resort, with no typing: an approximate place (about 10 km) from the network. Good enough for the Qibla direction.
+  async function fromNetwork(): Promise<boolean> {
+    try {
+      const r = await fetch('/api/where', { signal: AbortSignal.timeout(8000), cache: 'no-store' })
+      const d = await r.json()
+      if (!r.ok || typeof d.lat !== 'number' || typeof d.lng !== 'number') return false
+      setCoords({ lat: d.lat, lng: d.lng })
+      haveRef.current = true
+      setLabel(typeof d.name === 'string' ? d.name : 'Your area')
+      setSource('network')
+      setError('')
+      return true
+    } catch {
+      return false
     }
   }
 
-  // Show the saved location straight away, then refine it if location access is already allowed.
+  // On opening: show what is already known at once (works offline), then find where you are now.
+  // If location is allowed, it refreshes silently; if the browser has not been asked yet, it asks; if blocked, it uses your saved place, then an approximate one from the network.
   useEffect(() => {
     if (!placeReady) return
-    if (place?.kind === 'coords' && typeof place.lat === 'number' && typeof place.lng === 'number') setCoords({ lat: place.lat, lng: place.lng })
-    permissionState().then((p) => {
-      if (p.state === 'granted') locate()
+    let off: (() => void) | undefined
+    const known = coordsFromPlace(place) ?? (() => {
+      const c = readSaved<{ lat?: number; lng?: number; name?: string }>('deen:coords')
+      return coordsFromPlace(c && typeof c.name === 'string' ? { kind: 'coords', lat: c.lat, lng: c.lng, label: c.name } : null)
+    })()
+    if (known) {
+      haveRef.current = true
+      setCoords(known.coords)
+      setLabel(known.label)
+      setSource('saved')
+    }
+    permissionState().then(async (p) => {
+      if (p.state === 'denied') {
+        setDenied(true)
+        if (!known && !(await fromNetwork())) setError(errorMessage('denied'))
+        else setNote('Location is blocked for this site, so this uses a saved or approximate place. Allow location in your browser settings for the exact direction.')
+      } else {
+        await locate()
+      }
+      off = p.onChange(() => void locate())
     })
+    return () => off?.()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [placeReady])
 
@@ -109,12 +171,20 @@ export default function QiblaPage() {
     <div className="text-center">
       <h1 className="text-2xl font-black text-[#0F766E] mb-4 text-left">Qibla Finder</h1>
 
-      {!coords && (
-        <button onClick={locate} className="px-5 py-3 rounded-xl bg-[#0F766E] text-white font-semibold">
-          Use my location
+      {finding && !coords && <p className="text-sm text-gray-500" role="status">Finding where you are…</p>}
+      {coords && label && (
+        <p className="text-sm text-gray-600 mb-2" data-testid="qibla-place">
+          📍 {label} <span className="text-gray-400">· {source === 'device' ? 'from your device' : source === 'network' ? 'approximate, from your network' : 'saved from before'}</span>
+          {finding && <span className="text-gray-400"> · updating…</span>}
+        </p>
+      )}
+      {(!coords || source !== 'device') && !finding && (
+        <button onClick={locate} className="px-4 py-2 rounded-xl bg-[#0F766E] text-white font-semibold text-sm">
+          {coords ? 'Update from my device' : 'Use my location'}
         </button>
       )}
-      {error && <p className="text-red-600 mt-3">{error}</p>}
+      {error && <p className="text-red-600 mt-3 text-sm" role="alert">{error}</p>}
+      {note && <p className="text-xs text-amber-700 mb-2" role="status">{note}</p>}
 
       {coords && bearing !== null && (
         <>

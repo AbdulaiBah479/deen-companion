@@ -277,6 +277,137 @@ export const RITUALS: Ritual[] = [
       { book: 'bukhari', number: 1284, must: 'takes' },
     ],
   },
+  {
+    id: 'adhan', title: 'The adhan, the iqamah and what to say', titleAr: 'الأذان والإقامة', icon: '📢', group: 'Everyday worship',
+    summary: 'The call to prayer, and the words the one who hears it repeats, with the dua taught by the Prophet ﷺ afterwards.',
+    when: 'At the start of each prayer time (the adhan), and just before the prayer is established (the iqamah).',
+    steps: [
+      'The muadhdhin stands, faces the Qiblah and calls the adhan aloud, slowly (the words are below). At Fajr he adds “Aṣ-ṣalātu khayrun minan-nawm” after “Come to success”.',
+      'The one who hears it stops what they are doing and repeats each phrase after him. At “Come to prayer” and “Come to success” they say “Lā ḥawla wa lā quwwata illā billāh” (there is no power or might except with Allah).',
+      'When he finishes, send blessings on the Prophet ﷺ and say the dua after the adhan (below).',
+      'The iqamah is called just before the prayer begins. Its words are the same, but each phrase is said once, except the takbir, and “Qad qāmatiṣ-ṣalāh” (the prayer has begun) is added twice after “Come to success”.',
+      'Make dua between the adhan and the iqamah: the Prophet ﷺ said it is not turned away.',
+    ],
+    notes: ['The Hanafi school says the iqamah’s phrases twice, like the adhan; the other schools say them once. All are accepted.'],
+    hadith: [{ book: 'bukhari', number: 614, must: 'Adhan' }],
+  },
+  {
+    id: 'adhkar-salah', title: 'Remembrance after the prayer', titleAr: 'أذكار ما بعد الصلاة', icon: '📿', group: 'Everyday worship',
+    summary: 'The words the Prophet ﷺ said after each obligatory prayer: asking forgiveness, glorifying Allah thirty-three times each, and reciting Ayat al-Kursi and the last three surahs.',
+    when: 'Right after the salam of each of the five prayers.',
+    steps: [
+      'Say “Astaghfirullāh” three times, then “Allāhumma antas-salām…”.',
+      'Say “Subḥānallāh” 33 times, “Al-ḥamdu lillāh” 33 times and “Allāhu akbar” 33 times, then complete the hundred with “Lā ilāha illallāhu waḥdahu lā sharīka lah, lahul-mulku wa lahul-ḥamdu wa huwa ‘alā kulli shay’in qadīr”.',
+      'Recite Ayat al-Kursi once: reported by al-Nasa’i that nothing stands between the one who recites it after each prayer and Paradise except death.',
+      'Recite Surat al-Ikhlas, al-Falaq and an-Nas (three times each after Fajr and Maghrib, once after the other prayers).',
+      'Then make your own dua.',
+    ],
+    notes: ['The count of three recitations after Fajr and Maghrib is reported in Abu Dawud and al-Tirmidhi.'],
+    hadith: [{ book: 'bukhari', number: 843, must: 'Subhan' }],
+  },
+  {
+    id: 'hajj-words', title: 'Hajj and Umrah: what to say, step by step', titleAr: 'أذكار الحج والعمرة', icon: '🕋', group: 'Special prayers',
+    summary: 'The words of the pilgrim: the talbiyah from the ihram, the dua at the Black Stone, between Safa and Marwa, and on the Day of Arafah.',
+    when: 'From entering ihram until the end of the rites.',
+    steps: [
+      'At the miqat, put on ihram and make the intention: “Labbayka ‘umrah” (for Umrah) or “Labbayka ḥajjan” (for Hajj). Begin saying the talbiyah, men aloud and women softly.',
+      'Keep saying the talbiyah until you reach the Kaaba (Umrah) or until you throw the stones at Jamrat al-‘Aqabah on the Day of Sacrifice (Hajj).',
+      'Tawaf: seven circuits starting at the Black Stone, with the Kaaba on your left. At the Stone say “Bismillāh, Allāhu akbar”. Between the Yemeni corner and the Stone say the dua in 2:201 (below). Make any dua you wish in the rest.',
+      'After tawaf, pray two rak‘ahs behind Maqam Ibrahim (Surat al-Kafirun and Surat al-Ikhlas), and drink Zamzam.',
+      'Sa‘i: go to Safa, recite 2:158, say “Abda’u bimā bada’allāhu bih”, face the Kaaba, say takbir and tahlil and make dua. Walk to Marwa; that is one. Seven in all, ending on Marwa.',
+      'On the Day of Arafah stand in dua until sunset. The best of what is said is the line below.',
+      'Throw the stones at the jamarat with “Allāhu akbar” at each pebble; then sacrifice, shave or trim, and complete the rites.',
+    ],
+    notes: ['Choose a reliable guide for the order of the rites; the Hajj and Umrah guides in the app give the whole sequence.', 'The talbiyah is said in Arabic; other dua may be in your own language.'],
+    quran: ['2:196', '2:158'],
+    hadith: [{ book: 'bukhari', number: 1549, must: 'Labbaika' }],
+  },
 ]
 
 export const ritualById = (id: string) => RITUALS.find((r) => r.id === id)
+
+// The exact words to say in each ritual, in the order they are said. An id is an entry in recitations.ts, or "quran:<passage>" for a
+// Quran passage copied from the app's Quran data. "at" says when in the ritual it is said.
+export type Say = { id: string; at: string }
+export const RITUAL_WORDS: Record<string, Say[]> = {
+  istikhara: [
+    { id: 'quran:kafirun', at: 'First rak‘ah, after al-Fatihah (commonly recited)' },
+    { id: 'quran:ikhlas', at: 'Second rak‘ah, after al-Fatihah (commonly recited)' },
+    { id: 'istikhara-dua', at: 'After the two rak‘ahs (or before the final salam)' },
+  ],
+  istisqa: [
+    { id: 'istisqa-dua', at: 'In the dua, with raised hands' },
+    { id: 'quran:rabbana-atina', at: 'A comprehensive dua to add' },
+    { id: 'rain-seen', at: 'When the rain falls' },
+    { id: 'istisqa-around', at: 'If the rain becomes too much' },
+  ],
+  janazah: [
+    { id: 'takbir', at: 'First takbir' },
+    { id: 'quran:fatiha', at: 'After the first takbir' },
+    { id: 'salawat', at: 'After the second takbir' },
+    { id: 'janazah-dua', at: 'After the third takbir (for an adult)' },
+    { id: 'janazah-child', at: 'After the third takbir, if the deceased is a child' },
+    { id: 'salam', at: 'After the fourth takbir, the salam' },
+    { id: 'istirja', at: 'On hearing of the death' },
+    { id: 'condolence', at: 'Consoling the family' },
+  ],
+  eid: [
+    { id: 'eid-takbir', at: 'On the way to the prayer, and from the night before' },
+    { id: 'eid-greeting', at: 'When you meet others' },
+  ],
+  qiyam: [
+    { id: 'quran:fatiha', at: 'Each rak‘ah' },
+    { id: 'quran:ikhlas', at: 'Commonly recited in Witr' },
+    { id: 'quran:kawthar', at: 'A short surah to recite' },
+  ],
+  tahiyya: [
+    { id: 'mosque-enter', at: 'Entering, with the right foot' },
+    { id: 'mosque-leave', at: 'Leaving, with the left foot' },
+  ],
+  wudu: [
+    { id: 'wudu-start', at: 'At the start' },
+    { id: 'wudu-end', at: 'After finishing' },
+  ],
+  sujud: [
+    { id: 'sujud-tilawa', at: 'In the prostration of recitation' },
+    { id: 'takbir', at: 'Say takbir going down and rising' },
+  ],
+  travel: [
+    { id: 'travel-dua', at: 'When you set out (on boarding)' },
+    { id: 'quran:travel-ayah', at: 'The verses in the travel dua' },
+  ],
+  marriage: [
+    { id: 'marriage-wish', at: 'Congratulating the couple' },
+    { id: 'before-intimacy', at: 'Between the spouses' },
+  ],
+  newborn: [{ id: 'newborn-wish', at: 'Congratulating the parents' }],
+  sick: [
+    { id: 'visit-sick', at: 'When you visit' },
+    { id: 'sick-pain', at: 'For the one in pain' },
+    { id: 'quran:falaq', at: 'Recited over the sick, with al-Ikhlas and an-Nas' },
+    { id: 'quran:nas', at: 'Recited over the sick' },
+    { id: 'quran:ikhlas', at: 'Recited over the sick' },
+    { id: 'istirja', at: 'On a death or any hardship' },
+    { id: 'condolence', at: 'Consoling the family' },
+  ],
+  adhan: [
+    { id: 'adhan', at: 'The adhan' },
+    { id: 'adhan-dua', at: 'After hearing it' },
+  ],
+  'adhkar-salah': [
+    { id: 'after-salah-istighfar', at: 'First' },
+    { id: 'tasbih-33', at: 'Then' },
+    { id: 'quran:kursi', at: 'Then, once' },
+    { id: 'quran:ikhlas', at: 'Then' },
+    { id: 'quran:falaq', at: 'Then' },
+    { id: 'quran:nas', at: 'Then' },
+  ],
+  'hajj-words': [
+    { id: 'talbiyah', at: 'From ihram' },
+    { id: 'black-stone', at: 'At the Black Stone, each circuit' },
+    { id: 'quran:rabbana-atina', at: 'Between the Yemeni corner and the Stone' },
+    { id: 'quran:safa-marwa', at: 'Approaching Safa' },
+    { id: 'safa-start', at: 'At Safa' },
+    { id: 'arafah-dua', at: 'On the Day of Arafah' },
+  ],
+}

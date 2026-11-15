@@ -1,5 +1,5 @@
 // Tests the location helpers.  Run: npm run test:location
-import { distanceKm, errorMessage, hasMoved } from '../src/lib/location.ts'
+import { coordsFromPlace, distanceKm, errorMessage, hasMoved } from '../src/lib/location.ts'
 
 let fails = 0
 const ok = (name: string, cond: boolean, info = '') => {
@@ -18,5 +18,9 @@ ok('a few km of GPS drift is not "moved"', !hasMoved(london, { lat: 51.52, lng: 
 ok('another city is "moved"', hasMoved(london, paris))
 ok('every error has a friendly message', ['denied', 'unsupported', 'timeout', 'unavailable'].every((e) => errorMessage(e).length > 20))
 ok('blocked message tells you what to do', /browser settings|choose a city/i.test(errorMessage('denied')))
+ok("device place gives coords", coordsFromPlace({ kind: "coords", lat: 8.4, lng: -13.2, label: "Freetown" })?.label === "Freetown")
+ok("city with map position gives coords", coordsFromPlace({ kind: "city", city: "Lagos", country: "Nigeria", geo: { lat: 6.5, lng: 3.4, tz: "Africa/Lagos" } })?.label === "Lagos, Nigeria")
+ok("city without map position gives none", coordsFromPlace({ kind: "city", city: "Lagos", country: "Nigeria" }) === null)
+ok("junk gives none", coordsFromPlace(null) === null && coordsFromPlace("x") === null && coordsFromPlace({ kind: "coords", lat: 999, lng: 0 }) === null && coordsFromPlace({ kind: "coords", lat: "1", lng: 2 }) === null)
 console.log(fails ? `\n${fails} FAILED` : '\nall passed')
 process.exit(fails ? 1 : 0)

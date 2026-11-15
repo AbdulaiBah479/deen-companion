@@ -1,6 +1,6 @@
 // Tests prayer-reminder logic: who may subscribe, what is due when, and what the message says.  Run: npm run test:push
 import { computeTimes } from '../src/lib/prayer-calc.ts'
-import { allowedEndpoint, dayIn, dueExtras, dueNow, extraMessage, messageFor, parseReminder, subId, validTimeZone } from '../src/lib/push.ts'
+import { allowedEndpoint, dayIn, dueExtras, dueNow, extraMessage, messageFor, short, parseReminder, subId, validTimeZone } from '../src/lib/push.ts'
 
 let fails = 0
 const ok = (name: string, cond: boolean, info = '') => {
@@ -85,5 +85,13 @@ ok('white-days reminder fires on exactly three evenings a Hijri month', white ==
 ok('nothing extra is sent when none are chosen', dueExtras(xr([]), new Date(Date.UTC(2026, 2, 20, 12, 0)), 1440).length === 0)
 ok('extra messages open the right page', extraMessage('kahf').url === '/quran/18' && extraMessage('adhkar-morning').url === '/duas')
 
+ok("the daily verse and hadith each come once a day", hits(["daily-ayah"], 21).length === 1 && hits(["daily-hadith"], 21).length === 1)
+const dvv = dueExtras(xr(["daily-ayah"]), new Date(Date.UTC(2026, 2, 21, 5, 0)), 1440)[0]
+ok("the verse message carries a real verse, its reference and opens that surah", !!dvv && /^Verse of the day · [0-9]+:[0-9]+$/.test(dvv.message.title) && dvv.message.body.length > 10 && dvv.message.url.startsWith("/quran/"), dvv?.message.title)
+const dhd = dueExtras(xr(["daily-hadith"]), new Date(Date.UTC(2026, 2, 21, 9, 0)), 1440)[0]
+ok("the hadith message carries a real hadith", !!dhd && /^Hadith of the day · /.test(dhd.message.title) && dhd.message.body.length > 20 && dhd.message.url === "/hadith", dhd?.message.title)
+ok("the verse changes day to day", extraMessage("daily-ayah", "2026-03-21").title !== extraMessage("daily-ayah", "2026-03-22").title)
+ok("without a date the messages still make sense", extraMessage("daily-ayah").body.length > 5 && extraMessage("daily-hadith").body.length > 5)
+ok("long text is cut at a word with an ellipsis", short("word ".repeat(100)).length <= 175 && short("word ".repeat(100)).endsWith("…") && short("A short one.") === "A short one." && !/\s…$/.test(short("word ".repeat(100))))
 console.log(fails ? `\n${fails} FAILED` : '\nall passed')
 process.exit(fails ? 1 : 0)

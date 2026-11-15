@@ -4,7 +4,8 @@ import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import { HadithCard, VerseChips } from '@/components/HadithCard'
 import { ReadAloudBar, useReadAloud, type Para } from '@/components/ReadAloud'
-import { GLOSSARY, SECTIONS, type Section } from '@/lib/basics'
+import RecitationCard from '@/components/RecitationCard'
+import { GLOSSARY, SECTIONS, SECTION_WORDS, STEP_WORDS, type Section } from '@/lib/basics'
 import { useLang } from '@/lib/languages'
 
 function SectionCard({ s, open }: { s: Section; open: boolean }) {
@@ -35,7 +36,12 @@ function SectionCard({ s, open }: { s: Section; open: boolean }) {
               <li key={i} className="rounded-xl bg-gray-50 border border-gray-200 p-3">
                 <p className="font-semibold"><span className="text-[#0F766E]">{i + 1}.</span> {st.title}</p>
                 <p className="mt-1">{st.body}</p>
-                {st.say && (
+                {(STEP_WORDS[s.id]?.[i] ?? []).length > 0 && (
+                  <div className="mt-2 space-y-2">
+                    {STEP_WORDS[s.id][i].map((id) => <RecitationCard key={id} id={id} />)}
+                  </div>
+                )}
+                {st.say && !(STEP_WORDS[s.id]?.[i] ?? []).length && (
                   <p className="mt-2 rounded-lg bg-teal-50 border border-teal-200 p-2">
                     <span className="block font-semibold text-teal-900">{st.say.translit}</span>
                     <span className="block text-xs text-gray-600">{st.say.meaning}</span>
@@ -55,6 +61,12 @@ function SectionCard({ s, open }: { s: Section; open: boolean }) {
               </li>
             ))}
           </ul>
+        )}
+        {(SECTION_WORDS[s.id] ?? []).length > 0 && (
+          <section className="space-y-2" aria-label="What to say">
+            <h3 className="font-bold text-[#0F766E]">What to say</h3>
+            {SECTION_WORDS[s.id].map((id) => <RecitationCard key={id} id={id} />)}
+          </section>
         )}
         {s.notes && (
           <div className="rounded-lg bg-amber-50 border border-amber-200 p-2 text-amber-900 space-y-1">

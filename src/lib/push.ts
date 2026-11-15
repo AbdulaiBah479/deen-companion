@@ -13,6 +13,7 @@ import { computeTimes, localDay, minutesNowIn } from './prayer-calc'
 import { toHijri, addDays } from './hijri'
 import { suggestTopic, topicById } from './khutbah'
 import { redis, redisConfigured } from './redis'
+import { hadithOfDay, verseOfDay } from './data'
 
 import { EXTRA_IDS, LEADS, PRAYERS, type ExtraKey, type PrayerKey } from './push-shared'
 export { LEADS, PRAYERS, type ExtraKey, type PrayerKey }
@@ -127,7 +128,13 @@ export function dueExtras(r: Pick<Reminder, 'lat' | 'lng' | 'tz' | 'method'> & {
     let detail = ''
     if (e === 'adhkar-morning') ok = hit(at(times.fajr, 30))
     else if (e === 'adhkar-evening') ok = hit(at(times.asr, 30))
-    else if (e === 'kahf') ok = weekday === 5 && hit(at(times.sunrise, 30))
+    else if (e === 'daily-ayah') {
+      ok = hit(at(times.sunrise, 60))
+      detail = dayIn(r.tz, now)
+    } else if (e === 'daily-hadith') {
+      ok = hit(at(times.dhuhr, 30))
+      detail = dayIn(r.tz, now)
+    } else if (e === 'kahf') ok = weekday === 5 && hit(at(times.sunrise, 30))
     else if (e === 'khutbah-topic') {
       ok = weekday === 4 && hit(at(times.maghrib, 30))
       const fri = addDays(day, 1)
@@ -144,12 +151,30 @@ export function dueExtras(r: Pick<Reminder, 'lat' | 'lng' | 'tz' | 'method'> & {
   return out
 }
 
+// A notification shows only a couple of lines: cut at a word, never in the middle of one.
+export function short(t: string, max = 170): string {
+  const clean = t.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').replace(/:(?=[A-Z])/g, ': ').trim()
+  if (clean.length <= max) return clean
+  const cut = clean.slice(0, max)
+  return cut.slice(0, Math.max(cut.lastIndexOf(' '), 40)).replace(/[,;:.\s]+$/, '') + '…'
+}
+
 export function extraMessage(e: ExtraKey, detail = '') {
   switch (e) {
     case 'adhkar-morning':
       return { title: 'Morning adhkar 🌅', body: 'Begin the day remembering Allah.', url: '/duas', tag: 'sunnah-adhkar-morning' }
     case 'adhkar-evening':
       return { title: 'Evening adhkar 🌇', body: 'A few minutes of remembrance before the night.', url: '/duas', tag: 'sunnah-adhkar-evening' }
+    case 'daily-ayah': {
+      const v = detail ? verseOfDay(detail, 'en') : null
+      if (!v) return { title: 'A verse for today 📖', body: 'Open the app for today’s verse.', url: '/dashboard', tag: 'sunnah-ayah' }
+      return { title: `Verse of the day · ${v.verse_key}`, body: short(v.translations[0]?.text ?? ''), url: `/quran/${v.surah}`, tag: 'sunnah-ayah' }
+    }
+    case 'daily-hadith': {
+      const h = detail ? hadithOfDay(detail) : null
+      if (!h) return { title: 'A hadith for today 📚', body: 'Open the app for today’s hadith.', url: '/hadith', tag: 'sunnah-hadith' }
+      return { title: `Hadith of the day · ${h.book} ${h.number}`, body: short(h.text), url: '/hadith', tag: 'sunnah-hadith' }
+    }
     case 'kahf':
       return { title: 'Jumu‘ah mubarak 🕌', body: 'A Friday sunnah: read Surat al-Kahf today.', url: '/quran/18', tag: 'sunnah-kahf' }
     case 'khutbah-topic':

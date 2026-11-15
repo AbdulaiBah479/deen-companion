@@ -46,6 +46,11 @@ var r=document.documentElement;r.dataset.theme=t;
 if(p.arSize)r.style.setProperty('--ar-size',p.arSize+'px');
 if(p.trSize)r.style.setProperty('--tr-size',p.trSize+'px');
 if(JSON.parse(localStorage.getItem('deen:kids')||'false'))r.dataset.kids='true';
+var a=JSON.parse(localStorage.getItem('deen:a11y')||'{}');
+if([115,130,150].indexOf(a.scale)>=0)r.setAttribute('data-scale',String(a.scale));
+if(a.contrast===true)r.setAttribute('data-contrast','high');
+if(a.plainFont===true)r.setAttribute('data-font','plain');
+if(a.calm===true)r.setAttribute('data-calm','on');
 }catch(e){}})();`;
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

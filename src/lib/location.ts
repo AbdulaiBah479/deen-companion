@@ -73,3 +73,13 @@ export async function permissionState(): Promise<{ state: 'granted' | 'prompt' |
     return { state: 'unknown', onChange: () => () => {} }
   }
 }
+
+// Coordinates already known from the saved place: the exact spot (device location) or the city's map position, when it has one.
+export function coordsFromPlace(p: unknown): { coords: Coords; label: string } | null {
+  const o = p as { kind?: string; lat?: unknown; lng?: unknown; label?: unknown; city?: unknown; country?: unknown; geo?: { lat?: unknown; lng?: unknown } } | null
+  if (!o || typeof o !== 'object') return null
+  const ok = (a: unknown, b: unknown) => typeof a === 'number' && typeof b === 'number' && Number.isFinite(a) && Number.isFinite(b) && Math.abs(a) <= 90 && Math.abs(b) <= 180
+  if (o.kind === 'coords' && ok(o.lat, o.lng)) return { coords: { lat: o.lat as number, lng: o.lng as number }, label: typeof o.label === 'string' && o.label ? o.label : 'Your saved location' }
+  if (o.kind === 'city' && o.geo && ok(o.geo.lat, o.geo.lng)) return { coords: { lat: o.geo.lat as number, lng: o.geo.lng as number }, label: [o.city, o.country].filter((x) => typeof x === 'string' && x).join(', ') }
+  return null
+}

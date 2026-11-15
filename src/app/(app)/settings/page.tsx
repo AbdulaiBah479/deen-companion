@@ -7,6 +7,7 @@ import LangSelect from '@/components/LangSelect'
 import OfflineAudioManager from '@/components/OfflineAudioManager'
 import OfflineManager from '@/components/OfflineManager'
 import OfflinePacks from '@/components/OfflinePacks'
+import ReadingComfort from '@/components/ReadingComfort'
 import { AR_SIZE, TR_SIZE, usePrefs, type Theme } from '@/lib/prefs'
 import { useStored } from '@/lib/storage'
 import { LOCAL_MODELS, detectWebGPU, isModelCached, loadLocalModel, removeModel, type GpuSupport, type LocalTier } from '@/lib/webllm'
@@ -191,6 +192,11 @@ export default function SettingsPage() {
             {aiMsg && <p className="text-sm text-[#0F766E]">{aiMsg}</p>}
           </div>
         )}
+      </section>
+
+      <section className={section}>
+        <h2 className="font-bold mb-2">Reading comfort</h2>
+        <ReadingComfort />
       </section>
 
       <section className={section}>

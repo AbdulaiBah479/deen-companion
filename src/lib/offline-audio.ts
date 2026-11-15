@@ -93,3 +93,13 @@ export async function storageUsage(): Promise<{ usage: number; quota: number } |
     return null
   }
 }
+
+// One-tap downloads of several surahs at once (the verse files already saved are skipped, so a stopped download can simply be started again).
+const range = (a: number, b: number) => Array.from({ length: b - a + 1 }, (_, i) => a + i)
+export type AudioPlan = { id: string; name: string; blurb: string; surahs: number[] }
+export const AUDIO_PLANS: AudioPlan[] = [
+  { id: 'essentials', name: 'The essentials', blurb: 'Al-Fatiha, Yasin, Ar-Rahman, Al-Waqi‘ah, Al-Mulk and Al-Kahf.', surahs: [1, 18, 36, 55, 56, 67] },
+  { id: 'juz-amma', name: 'Juz Amma (the last part)', blurb: 'Surahs 78 to 114: the short ones used in daily prayers.', surahs: range(78, 114) },
+  { id: 'whole', name: 'The whole Quran', blurb: 'All 114 surahs. It is large, so use Wi-Fi.', surahs: range(1, 114) },
+]
+export const planBytes = (plan: AudioPlan, versesOf: (surah: number) => number, folder: string) => plan.surahs.reduce((s, n) => s + estimateBytes(versesOf(n), folder), 0)

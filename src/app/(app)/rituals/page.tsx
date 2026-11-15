@@ -4,7 +4,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { HadithCard, VerseChips } from '@/components/HadithCard'
 import { ReadAloudBar, useReadAloud, type Para } from '@/components/ReadAloud'
 import { useLang } from '@/lib/languages'
-import { GROUPS, RITUALS, type Ritual } from '@/lib/rituals'
+import RecitationCard from '@/components/RecitationCard'
+import { GROUPS, RITUALS, RITUAL_WORDS, type Ritual } from '@/lib/rituals'
 
 function RitualCard({ r, open }: { r: Ritual; open: boolean }) {
   const { lang } = useLang()
@@ -25,6 +26,17 @@ function RitualCard({ r, open }: { r: Ritual; open: boolean }) {
             <li key={i} className={reader.active === i + 3 ? 'bg-teal-50 rounded' : ''}>{s}</li>
           ))}
         </ol>
+        {(RITUAL_WORDS[r.id] ?? []).length > 0 && (
+          <section className="space-y-2" aria-label="What to say" data-testid="ritual-words">
+            <h3 className="font-bold text-[#0F766E]">What to say, in order</h3>
+            {RITUAL_WORDS[r.id].map((w, i) => (
+              <div key={w.id + i}>
+                <p className="text-xs text-gray-500 mb-1">{i + 1}. {w.at}</p>
+                <RecitationCard id={w.id} />
+              </div>
+            ))}
+          </section>
+        )}
         {r.notes && (
           <div className="rounded-lg bg-amber-50 border border-amber-200 p-2 text-amber-900 space-y-1">
             <p className="text-xs font-bold">Good to know</p>

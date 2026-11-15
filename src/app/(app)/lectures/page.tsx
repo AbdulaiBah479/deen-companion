@@ -19,17 +19,23 @@ export default function LecturesPage() {
   const [error, setError] = useState('')
   const [channel, setChannel] = useState('all')
   const [playing, setPlaying] = useState<string | null>(null)
+  const [tries, setTries] = useState(0)
 
   useEffect(() => {
     let off = false
-    fetch('/api/lectures')
+    setError('')
+    fetch('/api/lectures', { cache: 'no-store' })
       .then((r) => r.json())
-      .then((d) => !off && setData(d))
+      .then((d) => {
+        if (off) return
+        if (!d || !Array.isArray(d.lectures)) throw new Error('bad')
+        setData(d)
+      })
       .catch(() => !off && setError('Could not load lectures. Check your connection.'))
     return () => {
       off = true
     }
-  }, [])
+  }, [tries])
 
   const list = data?.lectures.filter((l) => channel === 'all' || l.channelId === channel) ?? []
 
@@ -38,7 +44,12 @@ export default function LecturesPage() {
       <h1 className="text-2xl font-black text-[#0F766E] mb-1">Lectures</h1>
       <p className="text-gray-500 text-sm mb-4">The newest talks from the teachers and institutions chosen for this app, updated automatically.</p>
 
-      {error && <p className="text-red-600">{error}</p>}
+      {error && (
+        <div className="mb-3">
+          <p className="text-red-600">{error}</p>
+          <button type="button" onClick={() => { setData(null); setTries((n) => n + 1) }} className="mt-2 rounded-xl border border-[#0F766E] text-[#0F766E] px-3 py-1.5 text-sm font-semibold">Try again</button>
+        </div>
+      )}
       {!data && !error && <p className="text-gray-500">Loading…</p>}
 
       {data && !data.configured && (
@@ -66,6 +77,13 @@ export default function LecturesPage() {
             ))}
           </div>
           {!!data.failed && <p className="text-xs text-amber-700 mb-2">Some channels could not be reached just now; showing the rest.</p>}
+          {list.length === 0 && (
+            <div className="bg-white border border-gray-200 rounded-2xl p-5 mb-3" data-testid="lectures-empty">
+              <p className="font-semibold mb-1">The talks could not be fetched just now.</p>
+              <p className="text-sm text-gray-600">The video service is not answering. This usually passes in a minute.</p>
+              <button type="button" onClick={() => { setData(null); setTries((n) => n + 1) }} className="mt-2 rounded-xl bg-[#0F766E] text-white px-4 py-2 text-sm font-semibold">Try again</button>
+            </div>
+          )}
           <ul className="space-y-4" data-testid="lectures-list">
             {list.map((l) => (
               <li key={l.id} className="bg-white border border-gray-200 rounded-2xl overflow-hidden">

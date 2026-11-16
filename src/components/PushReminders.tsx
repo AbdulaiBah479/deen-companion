@@ -70,6 +70,19 @@ export default function PushReminders({ place, method }: { place: Place; method:
       .catch(() => {})
   }, [ready, saved, place, method, status, supported, sync])
 
+  // The notification checkup's "Fix it": sign this device up with the server again.
+  useEffect(() => {
+    const again = () => {
+      lastSent.current = ''
+      navigator.serviceWorker?.ready
+        .then((reg) => reg.pushManager.getSubscription())
+        .then((sub) => (sub ? sync(sub, saved) : undefined))
+        .catch(() => {})
+    }
+    window.addEventListener('deen:push-resync', again)
+    return () => window.removeEventListener('deen:push-resync', again)
+  }, [saved, sync])
+
   if (!status?.configured || supported === null) return null
   if (!supported) {
     return <p className="text-xs text-gray-500 mb-3">This browser can’t send reminders when the app is closed. (On iPhone, add Deen Companion to your Home Screen first.)</p>

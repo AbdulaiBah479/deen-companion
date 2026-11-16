@@ -213,6 +213,13 @@ Prayer reminders and the health checks need something to call the app on a sched
 - **Main clock: cron-job.org (free).** Make two cron jobs, each sending a **POST** with the header `Authorization: Bearer <CRON_SECRET>`: `https://<your-site>/api/push/dispatch` every 5 minutes, and `https://<your-site>/api/cron/watchdog` every 10 minutes.
 - **Backup:** the two GitHub workflows still run, hourly and every 3 hours.
 - **Extra backup:** any phone with reminders switched on and the app open also nudges the server (`/api/push/tick`, at most once every 3 minutes).
+- **One timer is enough.** Each call to `/api/push/dispatch` also starts the health checks if they have not run for 9 minutes (after the reply is sent), so the second cron-job.org job (`/api/cron/watchdog`) is optional.
+- **Changing the secret without a gap.** The app accepts two secrets at once: `CRON_SECRET` and `CRON_SECRET_NEXT`. Run `npm run secret` (it copies a new strong secret to your clipboard and never prints it), add it in Vercel as `CRON_SECRET_NEXT`, redeploy, change the Authorization header in cron-job.org to `Bearer <new secret>`, then in Vercel set `CRON_SECRET` to the new value and delete `CRON_SECRET_NEXT`, and update the GitHub secret `CRON_SECRET`.
+
+## When something does not work for a user
+
+- **Notifications:** the Prayer page has a **“Not getting notifications?”** checkup (`NotificationCheckup`, rules in `lib/push-check.ts`). It checks the phone (permission, Home Screen app on iPhone, subscription) and the server (does it know this device, is the timer running), says what to do, can sign the device up again in one tap, and can send a test.
+- **Sign-up e-mails:** if the confirmation e-mail cannot be sent, the sign-up form tells the person plainly, offers “Continue without an account”, and reports it (a count only) so the control room shows “People can sign up” as a to-do and sends you one phone alert every 6 hours. The control room also has **Test e-mail sending**, which sends one password-reset e-mail to an existing account and shows Supabase’s own error if the mail setup is wrong.
 
 ## The Academy (courses)
 

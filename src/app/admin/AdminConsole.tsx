@@ -147,6 +147,22 @@ export default function AdminConsole() {
     await load()
   }
 
+  const [mailTo, setMailTo] = useState('')
+  const [mailRes, setMailRes] = useState<{ ok: boolean; text: string } | null>(null)
+  async function testMail() {
+    setMailRes(null)
+    setBusy('mailtest')
+    try {
+      const res = await fetch('/api/admin/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'mailtest', email: mailTo }) })
+      const d = await res.json()
+      setMailRes({ ok: !!d.ok, text: d.message || d.error || 'No answer.' })
+    } catch {
+      setMailRes({ ok: false, text: 'That did not work. Try again.' })
+    } finally {
+      setBusy('')
+    }
+  }
+
   async function act(action: string, label: string) {
     setBusy(action)
     setNote('')
@@ -355,6 +371,16 @@ export default function AdminConsole() {
                   <li>Come back here and press <b>Send a test alert</b>. It should appear in the ntfy app.</li>
                 </ol>
               </details>
+            </section>
+
+            <section aria-labelledby="h-mail" className={`${card} space-y-2`} data-testid="admin-mailtest">
+              <h2 id="h-mail" className="font-bold">Test e-mail sending</h2>
+              <p className="text-sm text-gray-600">Checks whether sign-up and password e-mails can be sent. Type the address of an account that already exists (yours), press the button, and read the answer. It sends one password-reset e-mail.</p>
+              <div className="flex gap-2 flex-wrap">
+                <input value={mailTo} onChange={(e) => setMailTo(e.target.value.slice(0, 200))} type="email" placeholder="an existing account’s e-mail" aria-label="E-mail to test" className="flex-1 min-w-[12rem] px-3 py-2 rounded-lg border border-gray-300 text-sm" />
+                <button onClick={testMail} disabled={!!busy} className="px-4 py-2 rounded-lg border border-[#0F766E] text-[#0F766E] font-semibold text-sm disabled:opacity-50">Send a test e-mail</button>
+              </div>
+              {mailRes && <p className={`text-sm rounded-lg p-2 ${mailRes.ok ? 'bg-green-50 text-green-900' : 'bg-red-50 text-red-800'}`} role="status" data-testid="mail-result">{mailRes.text}</p>}
             </section>
 
             <section aria-labelledby="h-health">

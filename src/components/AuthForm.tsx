@@ -13,6 +13,7 @@ export default function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [busy, setBusy] = useState(false)
+  const [mailProblem, setMailProblem] = useState(false) // the confirmation e-mail could not be sent (our side): offer to carry on without an account
   const [needsConfirm, setNeedsConfirm] = useState(false) // signed in before confirming the e-mail: offer to send the link again
 
   async function submit(e: React.FormEvent) {
@@ -57,7 +58,13 @@ export default function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
     } catch (err) {
       const m = err instanceof Error ? err.message : ''
       // The mail service can fail on our side; say so plainly instead of showing a technical message.
-      setError(/sending (confirmation )?e-?mail|smtp|rate limit|too many/i.test(m) ? 'We could not send your confirmation e-mail just now. Please try again in a few minutes. If it keeps happening, tell us on the Report page.' : m || 'Something went wrong')
+      const mailProblem = /sending (confirmation )?e-?mail|smtp|rate limit|too many/i.test(m)
+      if (mailProblem) {
+        setMailProblem(true)
+        // Tell the owner (a count only, no e-mail address) so it is fixed without anyone having to report it.
+        void fetch('/api/account/signup-problem', { method: 'POST' }).catch(() => {})
+      }
+      setError(mailProblem ? 'We could not send your confirmation e-mail just now. The owner has been told. Please try again later, or use the app without an account for now: everything still works and is saved on this device.' : m || 'Something went wrong')
     } finally {
       setBusy(false)
     }
@@ -135,6 +142,7 @@ export default function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
         </div>
 
         {error && <p className="text-sm text-red-600">{error}</p>}
+        {mailProblem && <Link href="/dashboard" className="block text-sm font-semibold text-[#0F766E] underline" data-testid="continue-without-account">Continue without an account →</Link>}
         {notice && <p className="text-sm text-[#0F766E]">{notice}</p>}
         {needsConfirm && (
           <button

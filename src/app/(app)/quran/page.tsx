@@ -2,16 +2,21 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import ListenPlanner from '@/components/ListenPlanner'
 import { useStored } from '@/lib/storage'
 import { useSurahData } from '@/lib/surah-list'
 
-type Tab = 'surah' | 'juz' | 'page' | 'saved'
+type Tab = 'surah' | 'juz' | 'page' | 'listen' | 'saved'
 
 export default function QuranPage() {
   const router = useRouter()
   const { surahs, juz, loading } = useSurahData()
   const [tab, setTab] = useState<Tab>('surah')
+  // /quran#listen (or #listen=18) opens the listening planner.
+  useEffect(() => {
+    if (location.hash.startsWith('#listen')) setTab('listen')
+  }, [])
   const [query, setQuery] = useState('')
   const [pageInput, setPageInput] = useState('')
   const [lastRead] = useStored<{ surah: number; verse: number } | null>('deen:lastRead', null)
@@ -58,6 +63,7 @@ export default function QuranPage() {
         {tabBtn('surah', 'Surah')}
         {tabBtn('juz', 'Juz')}
         {tabBtn('page', 'Page')}
+        {tabBtn('listen', '🎧 Listen')}
         {tabBtn('saved', `Saved${bookmarks.length ? ` (${bookmarks.length})` : ''}`)}
       </div>
 
@@ -147,6 +153,8 @@ export default function QuranPage() {
           </div>
         </div>
       )}
+
+      {tab === 'listen' && <ListenPlanner surahs={surahs} />}
 
       {tab === 'saved' && (
         <div>

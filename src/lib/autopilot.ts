@@ -270,3 +270,18 @@ export async function runAutopilot(): Promise<Report> {
   for (const f of fixes) await addIncident({ level: 'info', component: 'autopilot', message: f })
   return { ok: overallOk(states, checks), at: new Date(now).toISOString(), checks, alerts, fixes }
 }
+
+// One timer is enough: the reminder timer (which calls the app every few minutes) also starts the health checks, but only when they
+// have not run for MIN_GAP_MIN minutes. A short lock in Redis stops two callers starting the same run. Returns what it did.
+export const MIN_GAP_MIN = 9
+export async function runAutopilotIfDue(): Promise<'ran' | 'not due' | 'unavailable'> {
+  if (!redisConfigured()) return 'unavailable'
+  try {
+    const [lock] = (await redis([['SET', 'ops:autopilot-lock', '1', 'NX', 'EX', MIN_GAP_MIN * 60 - 30]])) as [string | null]
+    if (lock !== 'OK') return 'not due'
+    await runAutopilot()
+    return 'ran'
+  } catch {
+    return 'unavailable'
+  }
+}

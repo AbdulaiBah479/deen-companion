@@ -7,6 +7,7 @@ import { PRAYER_NAMES } from '@/lib/prayer'
 import { countdown, nextPrayerIn, secondsNowIn } from '@/lib/adhan'
 import { loadPrayerTimes } from '@/lib/prayer-source'
 import PrayerAlarms from '@/components/PrayerAlarms'
+import NotificationCheckup from '@/components/NotificationCheckup'
 import PushReminders from '@/components/PushReminders'
 import type { Place } from '@/lib/use-prayer-times'
 import { localDateKey, useStored } from '@/lib/storage'
@@ -235,6 +236,7 @@ export default function PrayerPage() {
           <PrayerAlarms times={times} timeZone={tz} />
 
           <PushReminders place={place} method={method} />
+          <NotificationCheckup />
 
           <p className="text-sm text-gray-600 mb-2">
             Today: {count}/5 prayers marked ({today})

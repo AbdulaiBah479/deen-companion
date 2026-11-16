@@ -163,6 +163,9 @@ export default function SurahReader({ surahNum }: { surahNum: number }) {
           >
             ▶ Play surah
           </button>
+          <Link href={`/quran#listen=${surahNum}`} className="px-4 py-2 rounded-full bg-white/15 text-sm font-semibold" data-testid="choose-parts">
+            🎧 Choose parts &amp; repeats
+          </Link>
           {meta?.page && (
             <Link href={`/quran/page/${meta.page}`} className="px-4 py-2 rounded-full bg-white/15 text-sm font-semibold">
               Mushaf page {meta.page}

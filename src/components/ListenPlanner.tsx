@@ -59,10 +59,7 @@ export default function ListenPlanner({ surahs }: { surahs: SurahInfo[] }) {
     if (p.pause) setPause(p.pause)
   }
   function play(p: Omit<ListenPlan, 'id'>) {
-    audio.setRepeat('off')
-    audio.setRepeatEach(p.each)
-    audio.setPause(p.pause)
-    audio.playRange(p.surah, p.from, p.to, p.loops)
+    audio.playPlan(p)
     setNote(`Playing ${planLabel(p)}. Use the player at the bottom to pause or skip.`)
   }
 

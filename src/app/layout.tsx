@@ -61,6 +61,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${geistSans.variable} ${quranFont.variable} h-full antialiased`}
     >
       <head>
+        {/* Recitation comes from this server: open the connection early so the first verse starts sooner. */}
+        <link rel="preconnect" href="https://everyayah.com" />
         <script dangerouslySetInnerHTML={{ __html: BOOT_SCRIPT }} />
       </head>
       <body className="min-h-full flex flex-col bg-[#F8FAFC] text-gray-900">

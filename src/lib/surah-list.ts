@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { STATIC_JUZ, STATIC_SURAHS } from './surah-static'
 
 export type SurahInfo = {
   id: number
@@ -14,35 +14,13 @@ export type SurahInfo = {
 export type JuzInfo = { juz: number; surah: number; verse: number; surahName: string; surahArabic: string; page: number }
 type SurahData = { surahs: SurahInfo[]; juz: JuzInfo[] }
 
-// One fetch per page load, shared by every component that needs surah names/counts.
-let promise: Promise<SurahData> | null = null
+// The list of surahs (and juz) is part of the app itself, so it is there at once: no download, no waiting, works offline.
+// (It is generated from the Quran data by `npm run gen:surahs`; a test checks that it matches.)
+const DATA: SurahData = { surahs: STATIC_SURAHS, juz: STATIC_JUZ }
 export function loadSurahData(): Promise<SurahData> {
-  if (!promise) {
-    promise = fetch('/api/quran/surahs')
-      .then((r) => r.json())
-      .then((d) => ({ surahs: d.surahs ?? [], juz: d.juz ?? [] }))
-      .catch(() => {
-        promise = null
-        return { surahs: [], juz: [] }
-      })
-  }
-  return promise
+  return Promise.resolve(DATA)
 }
 
 export function useSurahData() {
-  const [data, setData] = useState<SurahData>({ surahs: [], juz: [] })
-  const [loading, setLoading] = useState(true)
-  useEffect(() => {
-    let cancelled = false
-    loadSurahData().then((d) => {
-      if (!cancelled) {
-        setData(d)
-        setLoading(false)
-      }
-    })
-    return () => {
-      cancelled = true
-    }
-  }, [])
-  return { ...data, loading }
+  return { ...DATA, loading: false }
 }

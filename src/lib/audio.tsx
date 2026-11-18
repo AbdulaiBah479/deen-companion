@@ -27,10 +27,13 @@ type AudioApi = {
   pause: Pause
   gap: Pause | null // set while waiting between plays (so the player can say "your turn")
   range: Range | null // the range being practised, if any
+  step: { play: number; round: number } | null // while practising: which hearing of the verse (1-based) and which round of the range
   reciter: string
   nowPlaying: { surah: number; ayah: number } | null
   playVerse: (surah: number, ayah: number) => void
   playRange: (surah: number, from: number, to: number, loops?: number) => void
+  // Plays a chosen part with its own repeat settings in one step (verses from–to, each heard `each` times, the whole part `loops` times).
+  playPlan: (p: { surah: number; from: number; to: number; each: number; loops: number; pause: Pause }) => void
   clearRange: () => void // stop practising a range but keep listening normally
   playUrl: (track: Track, onEnd?: () => void) => void
   toggle: () => void
@@ -67,6 +70,8 @@ export default function AudioProvider({ children }: { children: React.ReactNode 
   const [sleepEndAt, setSleepEndAt] = useState<number | null>(null)
   const [gap, setGap] = useState<Pause | null>(null)
   const [range, setRangeState] = useState<Range | null>(null)
+  const [step, setStep] = useState<{ play: number; round: number } | null>(null)
+  const prefetchRef = useRef<HTMLAudioElement | null>(null) // quietly loads the next verse so it starts without a pause
 
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const onEndRef = useRef<(() => void) | null>(null)
@@ -113,6 +118,30 @@ export default function AudioProvider({ children }: { children: React.ReactNode 
     }
   }, [])
 
+  // While one verse plays, the next one is already being downloaded, so the gap between verses is as short as it can be (this matters most
+  // on a slow connection, where every verse is a separate small file).
+  const prefetchNext = useCallback(async (surah: number, ayah: number) => {
+    try {
+      const p = prefsRef.current
+      const plan: Plan = { repeatEach: p.repeat === 'one' ? 0 : p.repeatEach, pause: p.pause, continuous: p.continuous, range: rangeRef.current }
+      const info = await loadSurahInfo()
+      const count = info.find((x) => x.id === surah)?.verses_count ?? 0
+      const nxt = afterVerse({ ...plan, repeatEach: 1 }, { surah, ayah, plays: 1, loopsDone: loopsRef.current }, count)
+      if (nxt.kind !== 'next' && nxt.kind !== 'restart') return
+      if (plan.repeatEach === 0) return
+      const url = getVerseAudioUrl(nxt.surah, nxt.ayah, reciterRef.current)
+      if (!prefetchRef.current) {
+        prefetchRef.current = new Audio()
+        prefetchRef.current.preload = 'auto'
+        prefetchRef.current.muted = true
+      }
+      if (prefetchRef.current.src !== url) {
+        prefetchRef.current.src = url
+        prefetchRef.current.load()
+      }
+    } catch {}
+  }, [])
+
   // Starts a verse. By default this is a fresh start by the user (counters reset, any range is dropped);
   // the practice logic passes keep* flags to carry on inside the same exercise.
   const goVerse = useCallback(
@@ -124,8 +153,11 @@ export default function AudioProvider({ children }: { children: React.ReactNode 
       playsRef.current = 1
       if (!keep.loops) loopsRef.current = 0
       if (!keep.range) setRange(null)
+      setStep({ play: 1, round: loopsRef.current + 1 })
       loadTrackRef.current(await verseTrack(surah, ayah), true)
+      void prefetchNext(surah, ayah)
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [verseTrack, clearGap, setRange]
   )
 
@@ -194,8 +226,12 @@ export default function AudioProvider({ children }: { children: React.ReactNode 
             clearGap()
             if (step.kind === 'replay') {
               playsRef.current++
+              setStep({ play: playsRef.current, round: loopsRef.current + 1 })
               a.currentTime = 0
-              a.play().catch(() => setPlaying(false))
+              a.play().catch(() => {
+                setPlaying(false)
+                setError('Your phone paused the recitation. Tap ▶ to carry on.')
+              })
             } else {
               if (step.kind === 'restart') loopsRef.current++
               void goVerse(step.surah, step.ayah, { range: !!rangeRef.current, loops: true })
@@ -226,7 +262,12 @@ export default function AudioProvider({ children }: { children: React.ReactNode 
       setTrack(t)
       setError('')
       setLoading(true)
-      if (autoplay) a.play().catch(() => setPlaying(false))
+      if (autoplay)
+        a.play().catch((e: unknown) => {
+          setPlaying(false)
+          setLoading(false)
+          if (e instanceof DOMException && e.name === 'NotAllowedError') setError('Your phone paused the recitation. Tap ▶ to carry on.')
+        })
     },
     [getAudio]
   )
@@ -244,6 +285,7 @@ export default function AudioProvider({ children }: { children: React.ReactNode 
     }
     clearGap()
     setRange(null)
+    setStep(null)
     setTrack(null)
     setPlaying(false)
     setLoading(false)
@@ -276,6 +318,7 @@ export default function AudioProvider({ children }: { children: React.ReactNode 
       pause: prefs.pause,
       gap,
       range,
+      step,
       reciter,
       nowPlaying: track?.surah && track.ayah ? { surah: track.surah, ayah: track.ayah } : null,
       playVerse: (surah, ayah) => {
@@ -285,6 +328,16 @@ export default function AudioProvider({ children }: { children: React.ReactNode 
         setRange({ surah, from, to: Math.max(from, to), loops })
         loopsRef.current = 0
         void goVerse(surah, from, { range: true, loops: true })
+      },
+      playPlan: (p) => {
+        // The player's settings are changed here and now (not on the next render), so the very first verse already follows the plan.
+        prefsRef.current = { ...prefsRef.current, repeat: 'off', repeatEach: p.each, pause: p.pause }
+        setPref('repeat', 'off')
+        setPref('repeatEach', p.each)
+        setPref('pause', p.pause)
+        setRange({ surah: p.surah, from: p.from, to: Math.max(p.from, p.to), loops: p.loops })
+        loopsRef.current = 0
+        void goVerse(p.surah, p.from, { range: true, loops: true })
       },
       clearRange: () => setRange(null),
       playUrl: (t, onEnd) => {
@@ -343,7 +396,7 @@ export default function AudioProvider({ children }: { children: React.ReactNode 
         if (modeRef.current === 'quran' && posRef.current) void goVerse(posRef.current.surah, posRef.current.ayah, { range: !!rangeRef.current, loops: true })
       },
     }),
-    [track, playing, loading, error, gap, range, prefs.rate, prefs.repeat, prefs.repeatEach, prefs.pause, reciter, goVerse, loadTrack, advance, setPref, setReciterState, stopAll, sleepEndAt, clearGap, setRange]
+    [track, playing, loading, error, gap, range, step, prefs.rate, prefs.repeat, prefs.repeatEach, prefs.pause, reciter, goVerse, loadTrack, advance, setPref, setReciterState, stopAll, sleepEndAt, clearGap, setRange]
   )
 
   // Lock-screen / headset controls and "now playing" info.

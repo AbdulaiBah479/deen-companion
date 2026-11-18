@@ -5,6 +5,8 @@ import { useEffect, useMemo, useState } from 'react'
 import CardModal from '@/components/CardModal'
 import TafsirPanel from '@/components/TafsirPanel'
 import { useAudio } from '@/lib/audio'
+import { EACH_CHOICES, LOOP_CHOICES } from '@/lib/listen-plan'
+import { useSurahData } from '@/lib/surah-list'
 
 export type SheetVerse = { key: string; surah: number; ayah: number; surahName?: string; arabic: string; translation: string }
 
@@ -24,11 +26,18 @@ export default function VerseSheet({
   const [tafsirOpen, setTafsirOpen] = useState(false)
   const [showCard, setShowCard] = useState(false)
   const [note, setNote] = useState('')
+  const [repeatOpen, setRepeatOpen] = useState(false)
+  const [toAyah, setToAyah] = useState(0)
+  const [each, setEach] = useState<number>(1)
+  const [rounds, setRounds] = useState<number>(1)
+  const { surahs } = useSurahData()
 
   useEffect(() => {
     setTafsirOpen(false)
     setNote('')
     setShowCard(false)
+    setRepeatOpen(false)
+    setToAyah(0)
   }, [verse?.key])
 
   // Stable object so the share image isn't regenerated on every re-render (e.g. audio progress).
@@ -116,6 +125,9 @@ export default function VerseSheet({
             <button className={btn} onClick={() => setShowCard(true)}>
               <span className="text-xl">🖼</span>Image
             </button>
+            <button className={btn} onClick={() => setRepeatOpen((o) => !o)} aria-pressed={repeatOpen} data-testid="sheet-repeat">
+              <span className="text-xl">🔁</span>Repeat
+            </button>
             <button className={btn} onClick={() => setTafsirOpen((o) => !o)} aria-pressed={tafsirOpen}>
               <span className="text-xl">📖</span>Tafsir
             </button>
@@ -135,6 +147,34 @@ export default function VerseSheet({
               <span className="text-xl">📄</span>Surah
             </Link>
           </div>
+          {repeatOpen && (() => {
+            const count = surahs.find((x) => x.id === verse.surah)?.verses_count ?? verse.ayah
+            const to = Math.min(count, Math.max(verse.ayah, toAyah || verse.ayah))
+            const chip = (on: boolean) => `rounded-full border px-3 py-1 text-sm ${on ? 'bg-[#0F766E] border-[#0F766E] text-white' : 'border-gray-300'}`
+            const times = (n: number) => (n === 0 ? '∞' : `${n}×`)
+            return (
+              <div className="mt-3 rounded-xl border border-gray-200 p-3 space-y-2" data-testid="sheet-repeat-panel">
+                <label className="block text-sm font-semibold">Play from {verse.key} to verse
+                  <select value={to} onChange={(e) => setToAyah(Number(e.target.value))} className="mt-1 w-full rounded-lg border border-gray-300 p-2 text-sm" aria-label="To verse">
+                    {Array.from({ length: count - verse.ayah + 1 }, (_, i) => verse.ayah + i).map((n) => <option key={n} value={n}>{n}</option>)}
+                  </select>
+                </label>
+                <div>
+                  <p className="text-sm font-semibold">Each verse</p>
+                  <div className="flex flex-wrap gap-1.5" role="group" aria-label="Times each verse is heard">
+                    {EACH_CHOICES.map((n) => <button key={n} type="button" aria-pressed={each === n} className={chip(each === n)} onClick={() => setEach(n)}>{times(n)}</button>)}
+                  </div>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold">The whole part</p>
+                  <div className="flex flex-wrap gap-1.5" role="group" aria-label="Times the whole part is repeated">
+                    {LOOP_CHOICES.map((n) => <button key={n} type="button" aria-pressed={rounds === n} className={chip(rounds === n)} onClick={() => setRounds(n)}>{times(n)}</button>)}
+                  </div>
+                </div>
+                <button type="button" data-testid="sheet-repeat-play" className="w-full rounded-xl bg-[#0F766E] text-white py-2 font-semibold" onClick={() => { audio.playPlan({ surah: verse.surah, from: verse.ayah, to, each, loops: rounds, pause: 'none' }); setNote(`Playing ${verse.surah}:${verse.ayah}${to > verse.ayah ? '–' + to : ''}, each verse ${times(each)}, whole part ${times(rounds)}.`); setRepeatOpen(false) }}>▶ Play</button>
+              </div>
+            )
+          })()}
           {note && <p className="text-sm text-[#0F766E] mt-3">{note}</p>}
 
           {tafsirOpen && <TafsirPanel verseKey={verse.key} />}

@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import LangSelect from '@/components/LangSelect'
 import ReaderToolbar from '@/components/ReaderToolbar'
 import ReadingBlock, { type ReadingVerse } from '@/components/ReadingBlock'
@@ -22,6 +22,92 @@ type Verse = {
   translations?: { text: string }[]
 }
 type Word = { ar: string; tr: string; en: string }
+
+type VerseItemProps = {
+  v: Verse
+  marked: boolean
+  vw?: Word[]
+  isActive: boolean
+  playingNow: boolean
+  tajweedMarkup?: string
+  rtl: boolean
+  tafsirOpen: boolean
+  surahNum: number
+  onBookmark: (key: string) => void
+  onTafsir: (key: string) => void
+  onPlay: (ayah: number, pauseInstead: boolean) => void
+  onSheet: (v: Verse) => void
+}
+
+// One verse card. Memoised: when the recitation moves on, only the verse that stopped and the one that started are redrawn,
+// not all 286 verses of a long surah (which made taps feel slow on a phone while the audio was playing).
+const VerseItem = memo(function VerseItem({ v, marked, vw, isActive, playingNow, tajweedMarkup, rtl, tafsirOpen, onBookmark, onTafsir, onPlay, onSheet }: VerseItemProps) {
+  return (
+    <li
+        id={`v${v.verse_number}`}
+        className={`verse-item bg-white border rounded-2xl p-5 transition-colors ${isActive ? 'border-[#D4AF37] verse-active' : 'border-gray-200'}`}
+      >
+        <div className="flex items-center justify-between mb-3 gap-2">
+          <span className="text-xs font-bold bg-[#0F766E]/10 text-[#0F766E] px-2 py-1 rounded-full">{v.verse_key}</span>
+          <div className="flex items-center gap-3 text-sm font-semibold">
+            <button
+              onClick={() => onBookmark(v.verse_key)}
+              aria-pressed={marked}
+              aria-label={marked ? 'Remove bookmark' : 'Bookmark verse'}
+              className={marked ? 'text-gold' : 'text-gray-500'}
+            >
+              {marked ? '★' : '☆'}
+            </button>
+            <Link href={`/companion?q=${encodeURIComponent(`Explain Quran ${v.verse_key}`)}&ctx=${encodeURIComponent(v.verse_key)}`} className="text-[#0F766E]">
+              Ask AI
+            </Link>
+            <button onClick={() => onTafsir(v.verse_key)} className="text-[#0F766E]">
+              Tafsir
+            </button>
+            <button
+              onClick={() => onPlay(v.verse_number, isActive && playingNow)}
+              className="text-[#0F766E]"
+              aria-label={isActive && playingNow ? 'Pause recitation' : `Play verse ${v.verse_number}`}
+            >
+              {isActive && playingNow ? '⏸ Pause' : '▶ Play'}
+            </button>
+            <button onClick={() => onSheet(v)} aria-label={`More actions for verse ${v.verse_key}`} className="text-gray-500 text-lg leading-none">
+              ⋯
+            </button>
+          </div>
+        </div>
+
+        {vw ? (
+          <div className="flex flex-wrap gap-x-4 gap-y-3 justify-start" dir="rtl" lang="ar">
+            {vw.map((w, i) => (
+              <span key={i} className="text-center">
+                <span className="block leading-[1.8]" style={{ fontSize: 'var(--ar-size)' }}>
+                  {w.ar}
+                </span>
+                <span className="block text-[11px] text-[#0F766E]" dir="ltr">
+                  {w.tr}
+                </span>
+                <span className="block text-xs text-gray-600" dir="ltr">
+                  {w.en}
+                </span>
+              </span>
+            ))}
+          </div>
+        ) : (
+          <p className="text-right verse-ar" dir="rtl" lang="ar">
+            {tajweedMarkup ? <TajweedText markup={tajweedMarkup} /> : v.text_uthmani}
+          </p>
+        )}
+
+        {v.translations?.[0] && (
+          <p className="text-gray-700 mt-3 verse-tr" dir={rtl ? 'rtl' : 'ltr'}>
+            {v.translations[0].text}
+          </p>
+        )}
+        {tafsirOpen && <TafsirPanel verseKey={v.verse_key} />}
+      </li>
+  )
+})
 
 export default function SurahReader({ surahNum }: { surahNum: number }) {
   const { lang, ready: langReady } = useLang()
@@ -100,13 +186,18 @@ export default function SurahReader({ surahNum }: { surahNum: number }) {
     if (active && audio.playing) document.getElementById(`v${active}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' })
   }, [active, audio.playing])
 
-  function toggleBookmark(key: string) {
-    setBookmarks((b) => (b.includes(key) ? b.filter((k) => k !== key) : [...b, key]))
-  }
+  const toggleBookmark = useCallback((key: string) => setBookmarks((b) => (b.includes(key) ? b.filter((k) => k !== key) : [...b, key])), [setBookmarks])
 
-  const toggleTafsir = (key: string) => setOpenTafsir((cur) => (cur === key ? null : key))
+  const toggleTafsir = useCallback((key: string) => setOpenTafsir((cur) => (cur === key ? null : key)), [])
 
-  const openSheet = (v: Verse) =>
+  // The audio object changes whenever anything about playback changes; the verse cards only need its actions, so they get them through a ref.
+  const audioRef = useRef(audio)
+  useEffect(() => {
+    audioRef.current = audio
+  }, [audio])
+  const onPlay = useCallback((ayah: number, pauseInstead: boolean) => (pauseInstead ? audioRef.current.toggle() : audioRef.current.playVerse(surahNum, ayah)), [surahNum])
+
+  const openSheet = useCallback((v: Verse) =>
     setSheet({
       key: v.verse_key,
       surah: surahNum,
@@ -114,7 +205,7 @@ export default function SurahReader({ surahNum }: { surahNum: number }) {
       surahName: meta?.name_simple,
       arabic: v.text_uthmani,
       translation: v.translations?.[0]?.text ?? '',
-    })
+    }), [surahNum, meta?.name_simple])
 
   const readingVerses: ReadingVerse[] = useMemo(
     () => verses.map((v) => ({ key: v.verse_key, surah: surahNum, ayah: v.verse_number, arabic: v.text_uthmani, tajweed: tj.map[v.verse_key] })),
@@ -242,77 +333,24 @@ export default function SurahReader({ surahNum }: { surahNum: number }) {
 
       {prefs.mode === 'translation' && (
         <ol className="space-y-4">
-          {verses.map((v) => {
-            const marked = bookmarks.includes(v.verse_key)
-            const vw = wbw ? words[v.verse_number] : undefined
-            const isActive = active === v.verse_number
-            return (
-              <li
-                id={`v${v.verse_number}`}
-                key={v.verse_key}
-                className={`bg-white border rounded-2xl p-5 transition-colors ${isActive ? 'border-[#D4AF37] verse-active' : 'border-gray-200'}`}
-              >
-                <div className="flex items-center justify-between mb-3 gap-2">
-                  <span className="text-xs font-bold bg-[#0F766E]/10 text-[#0F766E] px-2 py-1 rounded-full">{v.verse_key}</span>
-                  <div className="flex items-center gap-3 text-sm font-semibold">
-                    <button
-                      onClick={() => toggleBookmark(v.verse_key)}
-                      aria-pressed={marked}
-                      aria-label={marked ? 'Remove bookmark' : 'Bookmark verse'}
-                      className={marked ? 'text-gold' : 'text-gray-500'}
-                    >
-                      {marked ? '★' : '☆'}
-                    </button>
-                    <Link href={`/companion?q=${encodeURIComponent(`Explain Quran ${v.verse_key}`)}&ctx=${encodeURIComponent(v.verse_key)}`} className="text-[#0F766E]">
-                      Ask AI
-                    </Link>
-                    <button onClick={() => toggleTafsir(v.verse_key)} className="text-[#0F766E]">
-                      Tafsir
-                    </button>
-                    <button
-                      onClick={() => (isActive && audio.playing ? audio.toggle() : audio.playVerse(surahNum, v.verse_number))}
-                      className="text-[#0F766E]"
-                      aria-label={isActive && audio.playing ? 'Pause recitation' : `Play verse ${v.verse_number}`}
-                    >
-                      {isActive && audio.playing ? '⏸ Pause' : '▶ Play'}
-                    </button>
-                    <button onClick={() => openSheet(v)} aria-label={`More actions for verse ${v.verse_key}`} className="text-gray-500 text-lg leading-none">
-                      ⋯
-                    </button>
-                  </div>
-                </div>
-
-                {vw ? (
-                  <div className="flex flex-wrap gap-x-4 gap-y-3 justify-start" dir="rtl" lang="ar">
-                    {vw.map((w, i) => (
-                      <span key={i} className="text-center">
-                        <span className="block leading-[1.8]" style={{ fontSize: 'var(--ar-size)' }}>
-                          {w.ar}
-                        </span>
-                        <span className="block text-[11px] text-[#0F766E]" dir="ltr">
-                          {w.tr}
-                        </span>
-                        <span className="block text-xs text-gray-600" dir="ltr">
-                          {w.en}
-                        </span>
-                      </span>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-right verse-ar" dir="rtl" lang="ar">
-                    {tajweed && tj.map[v.verse_key] ? <TajweedText markup={tj.map[v.verse_key]} /> : v.text_uthmani}
-                  </p>
-                )}
-
-                {v.translations?.[0] && (
-                  <p className="text-gray-700 mt-3 verse-tr" dir={isRtl(lang) ? 'rtl' : 'ltr'}>
-                    {v.translations[0].text}
-                  </p>
-                )}
-                {openTafsir === v.verse_key && <TafsirPanel verseKey={v.verse_key} />}
-              </li>
-            )
-          })}
+          {verses.map((v) => (
+            <VerseItem
+              key={v.verse_key}
+              v={v}
+              surahNum={surahNum}
+              marked={bookmarks.includes(v.verse_key)}
+              vw={wbw ? words[v.verse_number] : undefined}
+              isActive={active === v.verse_number}
+              playingNow={audio.playing}
+              tajweedMarkup={tajweed ? tj.map[v.verse_key] : undefined}
+              rtl={isRtl(lang)}
+              tafsirOpen={openTafsir === v.verse_key}
+              onBookmark={toggleBookmark}
+              onTafsir={toggleTafsir}
+              onPlay={onPlay}
+              onSheet={openSheet}
+            />
+          ))}
         </ol>
       )}
 

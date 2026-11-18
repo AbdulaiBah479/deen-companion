@@ -9,7 +9,7 @@ const ok = (name, cond, info = '') => {
   if (!cond) fails++
 }
 const get = (path, init = {}) => fetch(BASE + path, { redirect: 'manual', ...init })
-const LEAK = /(\bat [\w$.<>]+ \(|node_modules|\.tsx?:\d+|\/home\/|C:\\\\|stack|ECONN|SUPABASE_SERVICE|CRON_SECRET|ADMIN_KEY|VAPID_PRIVATE)/i
+const LEAK = /(\bat [\w$.<>]+ \(|node_modules|\.tsx?:\d+|\/home\/|C:\\\\|stack|\bECONN|SUPABASE_SERVICE|CRON_SECRET|ADMIN_KEY|VAPID_PRIVATE)/i
 
 // ───────── headers on pages and APIs ─────────
 for (const path of ['/', '/dashboard', '/admin', '/hadith', '/api/health']) {

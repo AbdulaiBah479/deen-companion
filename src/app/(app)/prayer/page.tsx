@@ -9,7 +9,7 @@ import { loadPrayerTimes } from '@/lib/prayer-source'
 import PrayerAlarms from '@/components/PrayerAlarms'
 import NotificationCheckup from '@/components/NotificationCheckup'
 import PushReminders from '@/components/PushReminders'
-import type { Place } from '@/lib/use-prayer-times'
+import { DEFAULT_PLACE, type Place } from '@/lib/use-prayer-times'
 import { localDateKey, useStored } from '@/lib/storage'
 
 type Times = {
@@ -42,7 +42,7 @@ const METHODS: [number, string][] = [
 const clean = (t: string) => t.split(' ')[0]
 
 export default function PrayerPage() {
-  const [place, setPlace, placeReady] = useStored<Place>('deen:place', { kind: 'city', city: 'London', country: 'UK' })
+  const [place, setPlace, placeReady] = useStored<Place>('deen:place', DEFAULT_PLACE)
   const [, setAuto] = useStored<boolean | null>('deen:place-auto', null)
   const [method, setMethod] = useStored<number>('deen:method', 2)
   const [, setMethodChosen] = useStored<boolean>('deen:method-chosen', false)

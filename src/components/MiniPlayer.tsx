@@ -42,6 +42,11 @@ export default function MiniPlayer() {
           <span className="block text-[11px] opacity-70 truncate" aria-live="polite">
             {a.error || (a.gap === 'echo' ? '🗣 Your turn — say it after the reciter' : a.gap === 'short' ? '…' : a.track.subtitle)}
           </span>
+          {a.range && a.step && (
+            <span className="block text-[11px] text-[#D4AF37]" data-testid="plan-progress">
+              Hearing {a.step.play} of {a.repeatEach === 0 ? '∞' : a.repeatEach}{a.range.loops !== 1 ? ` · round ${a.step.round} of ${a.range.loops === 0 ? '∞' : a.range.loops}` : ''}
+            </span>
+          )}
         </Link>
         <button onClick={a.stop} aria-label="Close player" className="w-8 h-8 rounded-full text-sm opacity-80 shrink-0">
           ✕

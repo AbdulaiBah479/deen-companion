@@ -7,9 +7,13 @@ import { useStored } from './storage'
 export type Times = { fajr: string; sunrise: string; dhuhr: string; asr: string; maghrib: string; isha: string; date: string; hijri: string; geo?: { lat: number; lng: number; tz: string } }
 export type Place = { kind: 'city'; city: string; country: string; geo?: { lat: number; lng: number; tz: string } } | { kind: 'coords'; lat: number; lng: number; label: string }
 
+// Until a person chooses a place, London is used. It carries its position and time zone, so the times are calculated on the device
+// at once, instead of waiting for a web service (which was the slowest thing on the home page for new visitors).
+export const DEFAULT_PLACE: Place = { kind: 'city', city: 'London', country: 'UK', geo: { lat: 51.5074, lng: -0.1278, tz: 'Europe/London' } }
+
 // Prayer times for the place and method saved on the Prayer page.
 export function usePrayerTimes() {
-  const [place, , placeReady] = useStored<Place>('deen:place', { kind: 'city', city: 'London', country: 'UK' })
+  const [place, , placeReady] = useStored<Place>('deen:place', DEFAULT_PLACE)
   const [method] = useStored<number>('deen:method', 2)
   const [times, setTimes] = useState<Times | null>(null)
   const [error, setError] = useState('')

@@ -1,9 +1,12 @@
 // Service worker: makes the app installable and usable offline.
 //  • static files (/_next/static, icons): cache-first
-//  • pages and API calls: network-first, then whatever was saved last time
+//  • the public Quran/hadith/dua data: shown at once from what was saved, and refreshed quietly in the background
+//  • pages: the network first, but when it takes longer than a few seconds the saved copy is shown instead (a slow connection no
+//    longer means a blank screen)
+//  • everything else (the AI, circles, lectures, anything personal): network-first, then whatever was saved last time
 //  • a page you never opened while online: a friendly /offline page instead of the browser's error
 // The Quran can be saved on purpose from Settings → Offline (see src/lib/offline.ts), which writes into the same cache.
-const CACHE = 'deen-v4'
+const CACHE = 'deen-v5'
 const SHELL = ['/offline', '/dashboard', '/quran', '/prayer', '/dhikr', '/more', '/duas', '/hadith', '/tafsir', '/journey', '/books', '/guides', '/qibla', '/qada', '/journal', '/giving', '/baby-names', '/halal', '/converter', '/icon.svg', '/icon-192.png']
 
 // Never keep these on a device: the owner's control room, the scheduler, reports, reminder sign-ups, accounts and AI questions.
@@ -52,6 +55,58 @@ async function savedAudio(req) {
   })
 }
 
+// Public, same-for-everyone data that changes rarely: safe to show from the saved copy while a fresh one is fetched.
+const PUBLIC_DATA = (path) => /^\/api\/(quran|names|duas|hadith|tafsir|learn)(\/|$)/.test(path)
+// Pages that must always come fresh: signing in, signing up and the owner's area.
+const FRESH_PAGE = (path) => /^\/(login|signup|admin|auth)(\/|$)/.test(path)
+// Next.js asks for the data of a page (not the page itself) with an RSC header or an _rsc parameter: keep those live.
+const isRsc = (req, url) => req.headers.get('RSC') === '1' || url.searchParams.has('_rsc')
+
+function staleWhileRevalidate(event, req) {
+  event.respondWith(
+    caches.open(CACHE).then(async (cache) => {
+      const hit = await cache.match(req)
+      const refresh = fetch(req)
+        .then((res) => {
+          if (res.ok) cache.put(req, res.clone())
+          return res
+        })
+        .catch(() => null)
+      if (hit) {
+        event.waitUntil(refresh) // keep the worker alive until the fresh copy is saved
+        return hit
+      }
+      const res = await refresh
+      if (res) return res
+      if (req.mode === 'navigate') return (await caches.match('/offline')) || Response.error()
+      return Response.error()
+    })
+  )
+}
+
+// Network first; if it has not answered within SLOW_MS and a saved copy exists, show the saved copy (the fresh one is still saved for next time).
+const SLOW_MS = 3500
+function networkThenSaved(event, req) {
+  event.respondWith(
+    caches.open(CACHE).then(async (cache) => {
+      const fetching = fetch(req)
+        .then((res) => {
+          if (res.ok) cache.put(req, res.clone())
+          return res
+        })
+        .catch(() => null)
+      const hit = await cache.match(req)
+      if (!hit) return (await fetching) || (await caches.match('/offline')) || Response.error()
+      const winner = await Promise.race([fetching, new Promise((r) => setTimeout(() => r('slow'), SLOW_MS))])
+      if (winner === 'slow') {
+        event.waitUntil(fetching)
+        return hit
+      }
+      return winner || hit
+    })
+  )
+}
+
 const isStatic = (url) => url.pathname.startsWith('/_next/static/') || /\.(svg|png|ico|webp|woff2?)$/.test(url.pathname)
 
 self.addEventListener('fetch', (event) => {
@@ -81,6 +136,11 @@ self.addEventListener('fetch', (event) => {
       )
     )
     return
+  }
+
+  if (!isRsc(req, url)) {
+    if (req.mode === 'navigate' && !FRESH_PAGE(url.pathname)) return networkThenSaved(event, req)
+    if (PUBLIC_DATA(url.pathname)) return staleWhileRevalidate(event, req)
   }
 
   event.respondWith(

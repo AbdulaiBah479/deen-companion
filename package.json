@@ -73,7 +73,8 @@
     "test:academy": "node --import ./tests/register-ts.mjs --experimental-strip-types --no-warnings tests/academy.test.mts",
     "test:listenplan": "node --import ./tests/register-ts.mjs --experimental-strip-types --no-warnings tests/listenplan.test.mts",
     "test:opsfix": "node --import ./tests/register-ts.mjs --experimental-strip-types --no-warnings tests/opsfix.test.mts",
-    "secret": "node scripts/new-secret.mjs"
+    "secret": "node scripts/new-secret.mjs",
+    "gen:surahs": "node --import ./tests/register-ts.mjs --experimental-strip-types --no-warnings scripts/gen-surah-static.mts"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",
@@ -85,7 +86,7 @@
     "class-variance-authority": "^0.7.1",
     "geomagnetism": "^0.2.0",
     "lucide-react": "^1.58.0",
-    "next": "^16.4.3",
+    "next": "^16.4.6",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "ts-fsrs": "^5.4.2",

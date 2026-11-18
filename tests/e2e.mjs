@@ -48,7 +48,9 @@ const ev = async (expr) => {
   if (r.result.exceptionDetails) throw new Error(r.result.exceptionDetails.exception?.description || 'eval error')
   return r.result.result.value
 }
-const goto = async (path) => { await send('Page.navigate', { url: BASE + path }); await sleep(400); await waitFor('document.readyState==="complete"', 30000); await sleep(600) }
+// A page counts as loaded once its controls are alive (hydrated): a page shown instantly from the service worker's saved copy can be tapped before React has attached to it.
+const HYDRATED = '(()=>{const els=[...document.querySelectorAll("button,input,select,textarea")].slice(0,10);return els.every(e=>Object.keys(e).some(k=>k.startsWith("__reactProps")))})()'
+const goto = async (path) => { await send('Page.navigate', { url: BASE + path }); await sleep(400); await waitFor('document.readyState==="complete"', 30000); await waitFor(HYDRATED, 10000); await sleep(600) }
 const waitFor = async (cond, ms = 15000) => { const end = Date.now() + ms; while (Date.now() < end) { try { if (await ev(cond)) return true } catch {} await sleep(250) } return false }
 const text = () => ev('document.body.innerText')
 const click = (sel, nth = 0) => ev(`(()=>{const e=document.querySelectorAll(${JSON.stringify(sel)})[${nth}]; if(!e) return false; e.click(); return true})()`)
@@ -1174,7 +1176,7 @@ t('offline: Settings → Offline starts with nothing saved', /Nothing saved yet/
 await clickText('Download the Quran for offline')
 const saved = await waitFor('/whole Quran is saved/.test(document.body.innerText)', 150000)
 t('offline: the whole Quran downloads and is reported as saved', saved, (await ev('document.querySelector("[data-testid=offline-status]")?.innerText')))
-const cached = await ev('caches.open("deen-v4").then(c=>c.keys()).then(k=>({api:k.filter(x=>x.url.includes("/api/quran/surah/")).length,pages:k.filter(x=>/\\/quran\\/\\d+$/.test(new URL(x.url).pathname)).length,shell:k.some(x=>x.url.endsWith("/offline"))}))')
+const cached = await ev('caches.open("deen-v5").then(c=>c.keys()).then(k=>({api:k.filter(x=>x.url.includes("/api/quran/surah/")).length,pages:k.filter(x=>/\\/quran\\/\\d+$/.test(new URL(x.url).pathname)).length,shell:k.some(x=>x.url.endsWith("/offline"))}))')
 t('offline: 114 surahs of text and 114 pages are in the cache, plus the offline page', cached.api === 114 && cached.pages >= 114 && cached.shell, JSON.stringify(cached))
 
 // Recitation for offline listening (the fake server provides a short generated clip for every verse).
@@ -1355,6 +1357,9 @@ await click('[data-testid=plan-play]')
 await waitFor('/Verse 108:1/.test(document.querySelector("[role=region][aria-label=\\"Audio player\\"]")?.innerText||"")', 20000)
 const lp = JSON.parse(await ev('localStorage.getItem("deen:prefs")||"{}"'))
 t('listen plan: Play starts the chosen part in the player, with the chosen repeat', /Verse 108:1/.test(await ev('document.querySelector("[role=region][aria-label=\\"Audio player\\"]")?.innerText||""')) && lp.repeatEach === 2, JSON.stringify(lp))
+t('listen plan: the player shows where you are in the plan (hearing 1 of 2, round 1 of 2)', /Hearing 1 of 2 · round 1 of 2/.test(await ev('document.querySelector("[data-testid=plan-progress]")?.innerText||""')), await ev('document.querySelector("[data-testid=plan-progress]")?.innerText||""'))
+await waitFor('/Hearing 2 of 2/.test(document.querySelector("[data-testid=plan-progress]")?.innerText||"")', 40000)
+t('listen plan: it plays the same verse a second time before moving on', /Verse 108:1/.test(await ev('document.querySelector("[role=region][aria-label=\\"Audio player\\"]")?.innerText||""')) && /Hearing 2 of 2/.test(await ev('document.querySelector("[data-testid=plan-progress]")?.innerText||""')))
 await clickText('Save this plan'); await waitFor('!!document.querySelector("[data-testid=saved-plans]")', 8000)
 t('listen plan: a plan can be saved and is listed under "My plans"', /108:1–3 · each verse 2× · whole 2×/.test(await ev('document.querySelector("[data-testid=saved-plans]").innerText')))
 await goto('/quran#listen'); await waitFor('!!document.querySelector("[data-testid=saved-plans]")', 15000)

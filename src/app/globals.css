@@ -243,7 +243,6 @@ html[data-theme="sepia"] textarea { background-color: #faf2e0; color: #3b2f1c; b
 .reel-pop { animation: reel-pop 0.35s ease-out; }
 @media (prefers-reduced-motion: reduce) { .reel-pop { animation: none; } .reels-scroll { scroll-behavior: auto; } }
 
-
 /* Gold text that stays readable: dark gold on light backgrounds, the bright gold on dark ones. (#D4AF37 on white is only 2.1:1.) */
 .text-gold { color: #7a5c00; }
 html[data-theme="dark"] .text-gold { color: #e6c86a; }
@@ -296,3 +295,4 @@ html[data-calm="on"] *, html[data-calm="on"] *::before, html[data-calm="on"] *::
   html.printing-cert .cert, html.printing-cert .cert * { visibility: visible; }
   html.printing-cert .cert { position: absolute; left: 0; top: 0; width: 100%; }
 }
+

@@ -1,7 +1,8 @@
 // Checks the "Listen plan" choices, and that the player's rules really play what the plan says.  Run: npm run test:listenplan
 import { EACH_CHOICES, LOOP_CHOICES, MAX_PLANS, PRESETS, addPlan, cleanPlans, estimateMinutes, fixPlan, planLabel, removePlan, totalPlays } from '../src/lib/listen-plan.ts'
 import { afterVerse, type Plan, type Pos } from '../src/lib/playback.ts'
-import { getSurahs, getVerses } from '../src/lib/data.ts'
+import { getSurahs, getVerses, juzIndex, surahPages } from '../src/lib/data.ts'
+import { STATIC_JUZ, STATIC_SURAHS } from '../src/lib/surah-static.ts'
 
 let fails = 0
 const ok = (name: string, cond: boolean, info = '') => {
@@ -58,5 +59,11 @@ ok('Ayat al-Kursi is 2:255 and al-Ikhlas has 4 verses', PRESETS[0].surah === 2 &
 ok('the last two verses of al-Baqarah are 285 and 286 (the end of the surah)', PRESETS[1].from === 285 && PRESETS[1].to === 286 && surahs[1].verses_count === 286)
 ok('al-Kahf has at least ten verses and al-Mulk has 30', surahs[17].verses_count >= 10 && surahs[66].verses_count === 30 && PRESETS.find((p) => p.title === 'Al-Mulk')!.to === 30)
 
+// The built-in surah list (shown at once, no download) is exactly the Quran data
+const pages = surahPages()
+ok('the built-in list has all 114 surahs and 30 juz', STATIC_SURAHS.length === 114 && STATIC_JUZ.length === 30)
+ok('the built-in list matches the Quran data: names, verse counts, places and pages', STATIC_SURAHS.every((s, i) => s.id === surahs[i].id && s.name_simple === surahs[i].name_simple && s.name_arabic === surahs[i].name_arabic && s.verses_count === surahs[i].verses_count && s.revelation_place === surahs[i].revelation_place && s.page === pages[i] && s.translated_name.name === surahs[i].translated_name.name))
+ok('the built-in juz index matches the Quran data', JSON.stringify(STATIC_JUZ) === JSON.stringify(juzIndex()))
+ok('verse counts add up to 6,236', STATIC_SURAHS.reduce((n, s) => n + s.verses_count, 0) === 6236)
 console.log(fails ? `\n${fails} FAILED` : '\nall passed')
 process.exit(fails ? 1 : 0)

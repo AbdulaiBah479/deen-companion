@@ -10,7 +10,7 @@ import { isRtl, useLang } from '@/lib/languages'
 import { PRAYER_NAMES } from '@/lib/prayer'
 import { minutesNowIn } from '@/lib/prayer-calc'
 import { loadPrayerTimes } from '@/lib/prayer-source'
-import type { Place } from '@/lib/use-prayer-times'
+import { DEFAULT_PLACE, type Place } from '@/lib/use-prayer-times'
 import SponsorSlot from '@/components/SponsorSlot'
 import { localDateKey, useStored } from '@/lib/storage'
 import type { CardInput } from '@/lib/share-card'
@@ -57,7 +57,7 @@ export default function DashboardPage() {
   const [prayers, , prayersReady] = useStored<Record<string, Record<string, boolean>>>('deen:prayers', {})
   const [kids] = useStored<boolean>('deen:kids', false)
   const [learn] = useStored<LearnState>('deen:learn', EMPTY_LEARN)
-  const [place, , placeReady] = useStored<Place>('deen:place', { kind: 'city', city: 'London', country: 'UK' })
+  const [place, , placeReady] = useStored<Place>('deen:place', DEFAULT_PLACE)
   const [method] = useStored<number>('deen:method', 2)
 
   useEffect(() => {

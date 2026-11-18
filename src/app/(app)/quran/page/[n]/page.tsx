@@ -3,7 +3,12 @@ import PageReader from '@/components/PageReader'
 
 async function Reader({ params }: { params: Promise<{ n: string }> }) {
   const { n } = await params
-  return <PageReader page={Number(n)} />
+  return (
+    <>
+      <h1 className="sr-only">Mushaf page {Number(n)}</h1>
+      <PageReader page={Number(n)} />
+    </>
+  )
 }
 
 export default function MushafPage({ params }: { params: Promise<{ n: string }> }) {

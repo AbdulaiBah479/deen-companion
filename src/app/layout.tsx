@@ -1,8 +1,10 @@
 import type { Metadata, Viewport } from "next";
+import { Suspense } from "react";
 import { Amiri_Quran, Geist } from "next/font/google";
 import "./globals.css";
 import ErrorReporter from "@/components/ErrorReporter";
 import RegisterSW from "@/components/RegisterSW";
+import RouteTitle from "@/components/RouteTitle";
 import SyncManager from "@/components/SyncManager";
 
 const geistSans = Geist({
@@ -68,6 +70,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="min-h-full flex flex-col bg-[#F8FAFC] text-gray-900">
         {children}
         <RegisterSW />
+        <Suspense fallback={null}>
+          <RouteTitle />
+        </Suspense>
         <ErrorReporter />
         <SyncManager />
       </body>

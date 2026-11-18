@@ -1047,6 +1047,11 @@ t('halal: an E-number finds its entry and tells you to check the source', (await
 await typeIn('input[aria-label="Search ingredients"]', 'zzzz'); await sleep(200)
 t('halal: an unknown ingredient gets honest advice, not a guess', !!(await ev('!!document.querySelector("[data-testid=halal-none]")')))
 
+await sleep(300)
+t('titles: a page has its own title in the tab (not just the site name)', /^Halal ingredient guide · Deen Companion$/.test(await ev('document.title')), await ev('document.title'))
+await goto('/quran/2'); await waitFor('/Al-Baqarah/.test(document.title)', 8000)
+t('titles: a surah page is titled with the surah', /Surah Al-Baqarah/.test(await ev('document.title')), await ev('document.title'))
+
 await goto('/converter'); await waitFor('!!document.querySelector("[data-testid=to-hijri]")', 15000)
 await typeIn('input[aria-label="Gregorian date"]', '2026-03-20'); await sleep(300)
 t('converter: 20 March 2026 is in Ramadan or Shawwal 1447', /(Ramadan|Shawwal) 1447/.test(await ev('document.querySelector("[data-testid=to-hijri]")?.innerText||""')), await ev('document.querySelector("[data-testid=to-hijri]")?.innerText||""'))

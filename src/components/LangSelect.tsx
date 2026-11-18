@@ -9,7 +9,7 @@ export default function LangSelect({ className = '' }: { className?: string }) {
       aria-label="Language"
       value={lang}
       onChange={(e) => setLang(e.target.value as LangCode)}
-      className={`px-3 py-2 rounded-lg border border-gray-300 bg-white text-sm ${className}`}
+      className={`max-w-full px-3 py-2 rounded-lg border border-gray-300 bg-white text-sm ${className}`}
     >
       {LANGUAGES.map((l) => (
         <option key={l.code} value={l.code}>

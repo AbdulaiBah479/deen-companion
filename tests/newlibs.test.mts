@@ -7,6 +7,7 @@ import * as A from '../src/lib/a11y.ts'
 import * as Hl from '../src/lib/halal.ts'
 import { AUDIO_PLANS, planBytes } from '../src/lib/offline-audio.ts'
 import { roughPlace } from '../src/lib/ip-place.ts'
+import { fullTitle, pageTitle } from '../src/lib/route-title.ts'
 
 let fails = 0
 const ok = (name: string, cond: boolean, info = '') => {
@@ -104,5 +105,12 @@ const whole = AUDIO_PLANS.find((p) => p.id === "whole")!
 ok("plans: the whole Quran is all 114 surahs, each once", whole.surahs.length === 114 && new Set(whole.surahs).size === 114 && whole.surahs[0] === 1 && whole.surahs[113] === 114)
 ok("plans: Juz Amma is 78 to 114", AUDIO_PLANS.find((p) => p.id === "juz-amma")!.surahs.join() === Array.from({ length: 37 }, (_, i) => 78 + i).join())
 ok("plans: size estimate grows with verses and is bigger for the whole Quran", planBytes(whole, () => 10, "Alafasy_128kbps") > planBytes(AUDIO_PLANS[0], () => 10, "Alafasy_128kbps"))
+// --- page titles
+ok("main pages have their own titles", fullTitle("/prayer") === "Prayer times and reminders · Deen Companion" && fullTitle("/halal").startsWith("Halal") && fullTitle("/qada").startsWith("Make-up"))
+ok("a surah page is titled with the surah", fullTitle("/quran/2") === "Surah Al-Baqarah · Deen Companion" && fullTitle("/quran/114").includes("An-Nas") && pageTitle("/quran/page/37") === "Mushaf page 37")
+ok("an out-of-range surah falls back to the section", pageTitle("/quran/999") === "The Noble Quran" && pageTitle("/quran/0") === "The Noble Quran")
+ok("course and lesson pages are titled", pageTitle("/learn/seerah") === "The Life of the Prophet ﷺ" && pageTitle("/learn/seerah/se-before").endsWith("· The Life of the Prophet ﷺ") && pageTitle("/learn/arabic-1") === "Arabic for Beginners")
+ok("stories and tafsir are titled", pageTitle("/stories/first-revelation") === "First revelation · Stories of the Quran" && pageTitle("/tafsir/1/5") === "Tafsir 1:5" && pageTitle("/tafsir/1").includes("Al-Fatihah"))
+ok("trailing slashes and unknown pages are handled", pageTitle("/prayer/") === pageTitle("/prayer") && fullTitle("/nothing-here") === "Deen Companion" && fullTitle("") === fullTitle("/"))
 console.log(fails ? `\n${fails} FAILED` : '\nAll passed')
 process.exit(fails ? 1 : 0)

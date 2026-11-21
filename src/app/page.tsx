@@ -1,4 +1,18 @@
+import type { Metadata } from 'next'
 import Link from 'next/link'
+import JsonLd from '@/components/JsonLd'
+import { appLd, faqLd, organizationLd, pageMetadata, websiteLd } from '@/lib/seo'
+
+export const metadata: Metadata = pageMetadata('/')
+
+const FAQ = [
+  { q: 'Is Deen Companion free?', a: 'Yes. It is free for everyone, with no ads and no tracking. It is kept running by voluntary support, and the Support page shows exactly where every contribution goes.' },
+  { q: 'Does it work without internet?', a: 'Yes, much of it does. You can save the Quran text, recitation audio, duas, rituals, courses and tools on your device, and prayer times and the Qibla direction are calculated on your phone.' },
+  { q: 'How are the prayer times calculated?', a: 'On your device, from your location, using the calculation method that is usual for your country. You can change the method and the place at any time. Times are checked against a reference service to within a couple of minutes.' },
+  { q: 'Which Quran reciters and translations are included?', a: 'There are 25 reciters, translations in 13 languages, tajweed colours, word-by-word meaning and 12 tafsirs. You can choose any verses and repeat them as many times as you want.' },
+  { q: 'Is the AI companion a source of fatwas?', a: 'No. It answers from the Quran, hadith and tafsir texts in the app, shows the sources, and is clearly labelled as AI. For rulings about your own situation, ask a qualified scholar.' },
+  { q: 'Can I install it on my phone?', a: 'Yes. Open the site in your browser and choose Add to Home Screen (iPhone) or Install (Android and computers). It then opens like any other app.' },
+]
 
 const FEATURES: [string, string, string][] = [
   ['🎙', 'Quran Identifier', 'Hear a recitation and find which verse it is'],
@@ -35,6 +49,7 @@ export default function HomePage() {
   const join = accounts ? '/signup' : '/dashboard'
   return (
     <main className="min-h-screen bg-[#F8FAFC]">
+      <JsonLd data={[websiteLd(), organizationLd(), appLd(), faqLd(FAQ)]} />
       <nav className="bg-white border-b border-gray-200 px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-2 sticky top-0 z-50">
         <div className="flex items-center gap-2 font-black text-base sm:text-xl shrink-0">
           <span className="text-2xl">☪</span>
@@ -142,6 +157,18 @@ export default function HomePage() {
               </span>
             ))}
           </div>
+        </div>
+      </section>
+
+      <section className="max-w-3xl mx-auto px-4 sm:px-6 py-14" aria-labelledby="faq-h">
+        <h2 id="faq-h" className="text-2xl sm:text-3xl font-black text-center mb-6">Questions people ask</h2>
+        <div className="space-y-3">
+          {FAQ.map((f) => (
+            <details key={f.q} className="rounded-2xl border border-gray-200 bg-white p-4 group">
+              <summary className="cursor-pointer font-bold">{f.q}</summary>
+              <p className="mt-2 text-gray-700">{f.a}</p>
+            </details>
+          ))}
         </div>
       </section>
 

@@ -94,6 +94,17 @@ export default function InstallBanner() {
   const [updated, setUpdated] = useState(false)
   const [iosOpen, setIosOpen] = useState(false)
   const [now, setNow] = useState(0)
+  // The install offer waits for the second visit, so a first-time visitor is not met by a pile of questions.
+  const [visits, setVisits] = useStored<number>('deen:visits', 0)
+  useEffect(() => {
+    try {
+      if (!sessionStorage.getItem('deen:counted')) {
+        sessionStorage.setItem('deen:counted', '1')
+        setVisits((v) => (typeof v === 'number' ? v : 0) + 1)
+      }
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     setNow(Date.now())
@@ -114,7 +125,7 @@ export default function InstallBanner() {
   }, [])
 
   const recentlyDismissed = now - dismissedAt < 14 * 86400_000
-  const offerInstall = !installed && !recentlyDismissed && (canPrompt || ios)
+  const offerInstall = !installed && !recentlyDismissed && visits >= 2 && (canPrompt || ios)
 
   return (
     <div className="space-y-2 empty:hidden">
@@ -126,7 +137,7 @@ export default function InstallBanner() {
       {updated && (
         <p role="status" className="rounded-lg bg-teal-50 border border-teal-200 text-teal-900 text-sm px-3 py-2 flex items-center gap-3" data-testid="update-banner">
           <span className="flex-1">A new version of Deen Companion is ready.</span>
-          <button onClick={() => location.reload()} className="px-3 py-1 rounded-lg bg-[#0F766E] text-white font-semibold">Refresh</button>
+          <button onClick={() => location.reload()} className="px-4 py-2 min-h-[40px] rounded-lg bg-[#0F766E] text-white font-semibold">Refresh</button>
         </p>
       )}
       {offerInstall && (
@@ -134,11 +145,11 @@ export default function InstallBanner() {
           <div className="flex items-center gap-2">
             <span className="flex-1">📲 Install Deen Companion for a faster, full-screen app.</span>
             {canPrompt ? (
-              <button onClick={install} className="px-3 py-1 rounded-lg bg-[#0F766E] text-white font-semibold">Install</button>
+              <button onClick={install} className="px-4 py-2 min-h-[40px] rounded-lg bg-[#0F766E] text-white font-semibold">Install</button>
             ) : (
               <button onClick={() => setIosOpen((v) => !v)} className="px-3 py-1 rounded-lg bg-[#0F766E] text-white font-semibold" aria-expanded={iosOpen}>How</button>
             )}
-            <button onClick={() => setDismissedAt(Date.now())} aria-label="Not now" className="text-gray-500 px-1">✕</button>
+            <button onClick={() => setDismissedAt(Date.now())} aria-label="Not now" className="text-gray-500 min-w-[44px] min-h-[44px] flex items-center justify-center">✕</button>
           </div>
           {iosOpen && <ol className="list-decimal pl-6 mt-2 space-y-1 text-gray-700">{IOS_STEPS.map((s) => <li key={s}>{s}</li>)}</ol>}
         </div>

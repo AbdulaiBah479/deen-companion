@@ -33,6 +33,17 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  async rewrites() {
+    return {
+      beforeFiles: [],
+      afterFiles: [],
+      // Only used when nothing else matches: the security contact file, and the IndexNow key file (named after the key).
+      fallback: [
+        { source: "/.well-known/security.txt", destination: "/security-txt" },
+        { source: "/:key([a-zA-Z0-9-]{8,128}).txt", destination: "/api/indexnow-key?key=:key" },
+      ],
+    };
+  },
   // The server reads the bundled Quran/hadith JSON from ./data at runtime; make sure deployments ship it.
   outputFileTracingIncludes: {
     '/api/**': ['./data/**/*'],

@@ -1,7 +1,5 @@
 import Link from 'next/link'
 
-export const metadata = { title: 'Privacy', description: 'What Deen Companion stores, what leaves your device, and who receives it.' }
-
 const contact = process.env.NEXT_PUBLIC_CONTACT_EMAIL
 const operator = process.env.NEXT_PUBLIC_OPERATOR_NAME || 'the operator of this app'
 

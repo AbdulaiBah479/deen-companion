@@ -15,7 +15,7 @@ import { useStored } from '@/lib/storage'
 import { useSurahData } from '@/lib/surah-list'
 import { useTajweed } from '@/lib/tajweed-client'
 
-type Verse = {
+export type Verse = {
   verse_number: number
   verse_key: string
   text_uthmani: string
@@ -109,15 +109,17 @@ const VerseItem = memo(function VerseItem({ v, marked, vw, isActive, playingNow,
   )
 })
 
-export default function SurahReader({ surahNum }: { surahNum: number }) {
+// `initial` is the surah in English, sent in the page's HTML by the server: the verses are there from the first moment (and for search
+// engines), without waiting for a download. Another language is fetched as before.
+export default function SurahReader({ surahNum, initial }: { surahNum: number; initial?: Verse[] }) {
   const { lang, ready: langReady } = useLang()
   const { prefs } = usePrefs()
   const audio = useAudio()
   const { surahs } = useSurahData()
   const meta = surahs.find((s) => s.id === surahNum)
 
-  const [verses, setVerses] = useState<Verse[]>([])
-  const [loading, setLoading] = useState(true)
+  const [verses, setVerses] = useState<Verse[]>(initial ?? [])
+  const [loading, setLoading] = useState(!initial?.length)
   const [error, setError] = useState('')
   const [tajweed, setTajweed] = useStored('deen:tajweed', false)
   const [wbw, setWbw] = useStored('deen:wbw', false)
@@ -138,6 +140,13 @@ export default function SurahReader({ surahNum }: { surahNum: number }) {
     if (!Number.isInteger(surahNum) || surahNum < 1 || surahNum > 114) {
       setError('Surah not found')
       setLoading(false)
+      return
+    }
+    if (lang === 'en' && initial?.length) {
+      setVerses(initial)
+      setLoading(false)
+      setError('')
+      setLastRead({ surah: surahNum, verse: 1 })
       return
     }
     let cancelled = false

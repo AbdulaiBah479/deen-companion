@@ -209,6 +209,33 @@ ok('validation: oversize message -> 400', (await askPatient('a'.repeat(2500))).s
   const off = await get('/offline')
   ok('the offline fallback page exists', off.status === 200 && (await off.text()).includes("You’re offline"))
   const sw = await (await get('/sw.js')).text()
+  // ── search engines: what the server sends, before any JavaScript runs ──
+  const pageHtml = async (p) => (await get(p)).text()
+  const metaOf = (h, re) => (h.match(re) || [])[1] || ''
+  const seoPages = { '/': /Deen Companion/, '/halal': /Halal ingredient/, '/quran/2': /Surah Al-Baqarah/, '/stories/adam': /Adam/, '/learn/seerah': /Life of the Prophet/, '/heritage/umar-abd-al-aziz': /Umar/, '/prayer': /Prayer times/ }
+  for (const [p, titleRe] of Object.entries(seoPages)) {
+    const h = await pageHtml(p)
+    const title = metaOf(h, /<title>([^<]*)<\/title>/)
+    const desc = metaOf(h, /<meta name="description" content="([^"]*)"/)
+    const canon = metaOf(h, /<link rel="canonical" href="([^"]*)"/)
+    ok(`seo ${p}: its own title, a description, a canonical address and social tags in the HTML`, titleRe.test(title) && desc.length >= 60 && /^https?:\/\//.test(canon) && /property="og:title"/.test(h) && /name="twitter:card"/.test(h), JSON.stringify({ title: title.slice(0, 60), desc: desc.length, canon }))
+  }
+  const surahHtml = await pageHtml('/quran/2')
+  ok('seo /quran/2: the verses are in the page itself (Arabic and English), not loaded afterwards', (surahHtml.match(/class="text-right verse-ar"/g) || []).length === 286 && surahHtml.includes('بِسْمِ') && /Alif, L/.test(surahHtml.replace(/<[^>]*>/g, ' ')) && surahHtml.includes('id="v255"'), 'length ' + surahHtml.length)
+  const ldBlocks = [...(await pageHtml('/')).matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)].map((m) => { try { return JSON.parse(m[1]) } catch { return null } })
+  ok('seo /: structured data for the website, organisation, app and FAQ is valid JSON', ldBlocks.length >= 1 && ldBlocks.every(Boolean) && JSON.stringify(ldBlocks).includes('FAQPage') && JSON.stringify(ldBlocks).includes('WebApplication') && JSON.stringify(ldBlocks).includes('SearchAction'))
+  const ldPage = [...(await pageHtml('/learn/seerah')).matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)].map((m) => JSON.parse(m[1]))
+  ok('seo /learn/seerah: course and breadcrumb data', JSON.stringify(ldPage).includes('"Course"') && JSON.stringify(ldPage).includes('BreadcrumbList'))
+  ok('seo: the sign-in, control room and offline pages are kept out of search', (await get('/robots.txt').then((r) => r.text())).includes('Disallow: /admin') && /noindex/.test(await pageHtml('/admin')))
+  const sitemapXml = await (await get('/sitemap.xml')).text()
+  ok('seo: the sitemap lists the home page, every surah, courses and stories', (sitemapXml.match(/<loc>/g) || []).length > 250 && /\/quran\/114</.test(sitemapXml) && /\/learn\/seerah</.test(sitemapXml) && /\/stories\/adam</.test(sitemapXml) && /<priority>/.test(sitemapXml) && /<lastmod>/.test(sitemapXml))
+  const llmsTxt = await get('/llms.txt')
+  ok('seo: llms.txt guides AI assistants to the main pages', llmsTxt.status === 200 && (await llmsTxt.text()).includes('## Worship'))
+  const secTxt = await get('/.well-known/security.txt')
+  ok('seo: security.txt says how to report a problem', secTxt.status === 200 && /Contact:/.test(await secTxt.text()))
+  ok('seo: a made-up page is a real 404 (not a soft one)', (await get('/this-page-does-not-exist-xyz')).status === 404)
+  for (const bad of ['/quran/999', '/quran/0', '/stories/nope', '/heritage/nope', '/learn/nope', '/learn/seerah/nope', '/books/nope', '/tafsir/999', '/quran/page/9999']) ok(`seo ${bad}: an address that does not exist is a real 404`, (await get(bad)).status === 404)
+  for (const good of ['/quran/114', '/stories/adam', '/learn/letters/letters-1', '/learn/words/words-40', '/tafsir/1/7', '/quran/page/604']) ok(`seo ${good}: a real page is not turned away`, (await get(good)).status === 200)
   const w0 = await get('/api/where')
   ok('/api/where without network position headers says unknown, uncached', w0.status === 404 && /no-store/.test(w0.headers.get('cache-control') || ''))
   const w1 = await fetch(APP + '/api/where', { headers: { 'x-vercel-ip-latitude': '8.4657', 'x-vercel-ip-longitude': '-13.2317', 'x-vercel-ip-city': 'Freetown', 'x-vercel-ip-country': 'SL' } })

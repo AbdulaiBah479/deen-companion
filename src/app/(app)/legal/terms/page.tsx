@@ -1,7 +1,5 @@
 import Link from 'next/link'
 
-export const metadata = { title: 'Terms of use', description: 'The ground rules for using Deen Companion.' }
-
 const contact = process.env.NEXT_PUBLIC_CONTACT_EMAIL
 const operator = process.env.NEXT_PUBLIC_OPERATOR_NAME || 'the operator of this app'
 

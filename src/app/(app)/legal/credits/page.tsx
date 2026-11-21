@@ -1,7 +1,5 @@
 import Link from 'next/link'
 
-export const metadata = { title: 'Sources & credits', description: 'Where the content in Deen Companion comes from, and its licences.' }
-
 const rows: [string, string, string][] = [
   ['Quran text, translations, chapter data, word-by-word, tajweed, tafsir', 'Quran.Foundation (api.quran.com)', 'Free for non-commercial use; each translation and tafsir stays the work of its authors and publishers — shown with its name where displayed.'],
   ['Quran recitation audio', 'EveryAyah (25 reciters) and Quran.com audio', 'Streamed from their servers, not stored here. Credit to the reciters.'],

@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import SponsorSlot from '@/components/SponsorSlot'
+import { useState } from 'react'
 import { useStored } from '@/lib/storage'
 
 const ITEMS = [
@@ -51,35 +52,65 @@ const ITEMS = [
   { href: '/settings', icon: '⚙️', title: 'Settings', desc: 'Language, kids mode, backup', kids: true },
 ]
 
+// The tiles are grouped by what a person is trying to do, so nothing is lost in one long list. A search box narrows them as you type.
+const GROUPS: { title: string; hrefs: string[] }[] = [
+  { title: 'Worship every day', hrefs: ['/prayer', '/qibla', '/duas', '/dhikr', '/habits', '/ramadan', '/calendar', '/qada', '/rituals', '/ruqyah'] },
+  { title: 'The Quran and knowledge', hrefs: ['/recite', '/hifz', '/goals', '/identify', '/search', '/tafsir', '/hadith', '/khutbah', '/books', '/library', '/lectures', '/listen', '/journey', '/names'] },
+  { title: 'Learn and play', hrefs: ['/basics', '/guides', '/stories', '/heritage', '/quiz', '/flashcards', '/games'] },
+  { title: 'Tools for life', hrefs: ['/zakat', '/giving', '/halal', '/converter', '/baby-names', '/journal', '/mosques', '/donate'] },
+  { title: 'Together', hrefs: ['/circle', '/reels/create'] },
+  { title: 'The app', hrefs: ['/support', '/report', '/settings'] },
+]
+
 export default function MorePage() {
   const [kids] = useStored<boolean>('deen:kids', false)
-  const items = kids ? ITEMS.filter((i) => i.kids) : ITEMS
+  const [q, setQ] = useState('')
+  const needle = q.trim().toLowerCase()
+  const items = (kids ? ITEMS.filter((i) => i.kids) : ITEMS).filter((i) => !needle || `${i.title} ${i.desc}`.toLowerCase().includes(needle))
+  const placed = new Set(GROUPS.flatMap((g) => g.hrefs))
+  const sections = [
+    ...GROUPS.map((g) => ({ title: g.title, tiles: g.hrefs.map((h) => items.find((i) => i.href === h)).filter((i): i is (typeof ITEMS)[number] => !!i) })),
+    { title: 'More', tiles: items.filter((i) => !placed.has(i.href)) },
+  ].filter((sec) => sec.tiles.length)
   return (
     <div>
       <h1 className="text-2xl font-black text-[#0F766E] mb-1">Everything else</h1>
       {kids && <p className="text-sm text-gray-500 mb-3">Kids mode is on — showing the child-friendly parts. Change it in Settings.</p>}
       {!kids && <div className="mt-3"><SponsorSlot /></div>}
-      <div className="grid grid-cols-2 gap-3 mt-3">
-        {items.map((t) => (
-          <Link
-            key={t.href}
-            href={t.href}
-            className="bg-white border border-gray-200 rounded-2xl p-4 hover:border-[#0F766E] transition-colors"
-          >
-            <div className="text-3xl mb-2">{t.icon}</div>
-            <div className="font-bold">{t.title}</div>
-            <div className="text-xs text-gray-500">{t.desc}</div>
-          </Link>
-        ))}
-      </div>
+      <input
+        value={q}
+        onChange={(e) => setQ(e.target.value.slice(0, 40))}
+        type="search"
+        inputMode="search"
+        enterKeyHint="search"
+        placeholder="Find a tool or page…"
+        aria-label="Find a tool or page"
+        className="w-full mt-3 rounded-xl border border-gray-300 bg-white px-4 py-3 text-base"
+        data-testid="more-filter"
+      />
+      {sections.length === 0 && <p className="mt-6 text-sm text-gray-600" data-testid="more-none">Nothing here matches “{q}”. Try the search at the top of the screen to look through the whole app.</p>}
+      {sections.map((sec) => (
+        <section key={sec.title} className="mt-5" aria-label={sec.title}>
+          <h2 className="font-bold text-gray-700 mb-2">{sec.title}</h2>
+          <div className="grid grid-cols-2 gap-3">
+            {sec.tiles.map((t) => (
+              <Link key={t.href} href={t.href} className="bg-white border border-gray-200 rounded-2xl p-4 hover:border-[#0F766E] active:scale-[0.98] transition-all min-h-[96px]" data-testid="more-tile">
+                <div className="text-3xl mb-2" aria-hidden="true">{t.icon}</div>
+                <div className="font-bold">{t.title}</div>
+                <div className="text-xs text-gray-500">{t.desc}</div>
+              </Link>
+            ))}
+          </div>
+        </section>
+      ))}
       <nav aria-label="About" className="mt-8 flex flex-wrap justify-center gap-x-5 gap-y-2 text-sm text-gray-500">
-        <Link href="/legal/privacy" className="underline">
+        <Link href="/legal/privacy" className="underline py-2">
           Privacy
         </Link>
-        <Link href="/legal/terms" className="underline">
+        <Link href="/legal/terms" className="underline py-2">
           Terms
         </Link>
-        <Link href="/legal/credits" className="underline">
+        <Link href="/legal/credits" className="underline py-2">
           Sources &amp; credits
         </Link>
       </nav>

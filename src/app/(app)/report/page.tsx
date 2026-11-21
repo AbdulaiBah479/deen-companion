@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { Suspense, useState } from 'react'
 import { REPORT_CATEGORIES } from '@/lib/reports-shared'
+import PageSkeleton from '@/components/PageSkeleton'
 
 function ReportForm() {
   const params = useSearchParams()
@@ -110,7 +111,7 @@ function ReportForm() {
 
 export default function ReportPage() {
   return (
-    <Suspense fallback={<p className="text-gray-500">Loading…</p>}>
+    <Suspense fallback={<PageSkeleton />}>
       <ReportForm />
     </Suspense>
   )

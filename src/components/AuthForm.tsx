@@ -13,6 +13,7 @@ export default function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [busy, setBusy] = useState(false)
+  const [showPw, setShowPw] = useState(false)
   const [mailProblem, setMailProblem] = useState(false) // the confirmation e-mail could not be sent (our side): offer to carry on without an account
   const [needsConfirm, setNeedsConfirm] = useState(false) // signed in before confirming the e-mail: offer to send the link again
 
@@ -109,7 +110,9 @@ export default function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
-              className="w-full px-3 py-2 rounded-lg border border-gray-300"
+              autoComplete="name"
+              enterKeyHint="next"
+              className="w-full px-3 py-3 rounded-lg border border-gray-300 text-base"
             />
           </div>
         )}
@@ -120,25 +123,39 @@ export default function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
           <input
             id="email"
             type="email"
+            inputMode="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
-            className="w-full px-3 py-2 rounded-lg border border-gray-300"
+            autoComplete="email"
+            autoCapitalize="none"
+            spellCheck={false}
+            enterKeyHint="next"
+            className="w-full px-3 py-3 rounded-lg border border-gray-300 text-base"
           />
         </div>
         <div>
           <label htmlFor="password" className="block text-sm font-medium mb-1">
             Password
           </label>
-          <input
-            id="password"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            minLength={8}
-            className="w-full px-3 py-2 rounded-lg border border-gray-300"
-          />
+          <div className="relative">
+            <input
+              id="password"
+              type={showPw ? 'text' : 'password'}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              minLength={8}
+              autoComplete={isSignup ? 'new-password' : 'current-password'}
+              enterKeyHint="go"
+              aria-describedby="pw-hint"
+              className="w-full px-3 py-3 pr-16 rounded-lg border border-gray-300 text-base"
+            />
+            <button type="button" onClick={() => setShowPw((v) => !v)} aria-pressed={showPw} aria-label={showPw ? 'Hide password' : 'Show password'} className="absolute right-1 top-1/2 -translate-y-1/2 px-3 min-h-[44px] text-sm font-semibold text-[#0F766E]">
+              {showPw ? 'Hide' : 'Show'}
+            </button>
+          </div>
+          {isSignup && <p id="pw-hint" className="text-xs text-gray-500 mt-1">At least 8 characters.</p>}
         </div>
 
         {error && <p className="text-sm text-red-600">{error}</p>}

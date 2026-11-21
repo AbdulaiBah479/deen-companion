@@ -7,6 +7,7 @@ import LangSelect from '@/components/LangSelect'
 import { HADITH_BOOKS } from '@/lib/hadith'
 import { isRtl, useLang } from '@/lib/languages'
 import { localDateKey } from '@/lib/storage'
+import PageSkeleton from '@/components/PageSkeleton'
 
 type Hadith = { hadithnumber: number; text: string; arabic?: string; grade?: string }
 type Section = { id: number; name: string; first: number; last: number; count: number }
@@ -371,7 +372,7 @@ function JumpTo({ book: initial, pickBook }: { book: string; pickBook?: boolean 
 
 export default function HadithPage() {
   return (
-    <Suspense fallback={<p className="text-gray-500">Loading…</p>}>
+    <Suspense fallback={<PageSkeleton />}>
       <HadithBrowser />
     </Suspense>
   )

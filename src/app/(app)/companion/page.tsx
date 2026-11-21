@@ -10,6 +10,7 @@ import { followUps as suggestFollowUps, withScholarNote } from '@/lib/care'
 import { isRtl, useLang } from '@/lib/languages'
 import { useStored } from '@/lib/storage'
 import { detectWebGPU, isModelCached, loadLocalModel, localChat, LOCAL_MODELS, type GpuSupport, type LocalTier } from '@/lib/webllm'
+import PageSkeleton from '@/components/PageSkeleton'
 
 type Source = { id: string; kind: 'quran' | 'hadith'; ref: string; arabic?: string; text: string; href: string }
 type Msg = {
@@ -304,7 +305,7 @@ function Companion() {
 
 export default function CompanionPage() {
   return (
-    <Suspense fallback={<p className="text-gray-500">Loading…</p>}>
+    <Suspense fallback={<PageSkeleton />}>
       <Companion />
     </Suspense>
   )

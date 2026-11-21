@@ -224,3 +224,22 @@ Prayer reminders and the health checks need something to call the app on a sched
 ## The Academy (courses)
 
 `/learn` is a small learning platform: structured courses with lessons, quizzes, progress, a streak, and a printable certificate of completion when every lesson is passed. For children: **My First Arabic Words** and **My Islam**. For students and everyone: **Arabic for Beginners** (pronouns, sentences, “the”, gender, plurals, roots, verbs, possession), **The Life of the Prophet ﷺ**, **Understanding the Quran**, plus the Arabic letters, Quran words, tajweed and foundations courses. Content lives in `src/lib/academy-content.ts` (add a course there and in `ACADEMY_PATHS`); `tests/academy.test.mts` checks that every quiz is answerable, the Arabic has its vowels, and facts like “114 surahs, 6,236 verses” match the app’s own Quran data. All lessons are saved by the “Learn and practise” offline pack. The lessons are written by hand for this app: have a teacher review them before you promote the courses, especially the Arabic grammar and the Seerah dates.
+
+## Search engines (SEO)
+
+Every page tells search engines what it is, in the HTML the server sends (before any JavaScript runs):
+
+- **Own title, description and canonical address for every page**, from one table: `src/lib/seo.ts`. Edit the words there, then run `npm run gen:seo` (it writes a small `layout.tsx` beside each page). Surah, story, person, course, lesson, tafsir, book and Mushaf-page titles are built from their own data. `npm run test:seo` checks that every real page has an entry, that titles and descriptions are the right length and unique, and that the sitemap lists every page.
+- **Social previews**: Open Graph and Twitter tags on every page, with a shared preview picture.
+- **Structured data (schema.org JSON-LD)**: WebSite with site search, Organization, WebApplication (free), FAQ (a visible FAQ on the home page), BreadcrumbList on inner pages, Course for each course, Article for stories, Book for books, Person for people. Test any page at https://search.google.com/test/rich-results
+- **The text is in the page itself**: all 114 surahs are built ahead of time with their Arabic and English verses in the HTML (search engines and slow connections see the verses at once, without waiting for a download).
+- **Sitemap** (`/sitemap.xml`) with dates, change frequency and priority for over 250 pages, **robots.txt**, a plain-text guide for AI assistants (`/llms.txt`), and `/.well-known/security.txt`.
+- **Real 404s** for pages that do not exist (for example a surah 999), so search engines do not index empty pages.
+
+What only you can do (a few minutes, once):
+
+1. **Google Search Console** (free): add the site, copy the verification code Google shows (the part inside `content="…"` of the meta tag option), set it in Vercel as `NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION`, redeploy, press Verify, then submit `https://<your-site>/sitemap.xml`.
+2. **Bing Webmaster Tools** (free; it also feeds DuckDuckGo and several AI search tools): you can import the site straight from Search Console. Or set `NEXT_PUBLIC_BING_SITE_VERIFICATION`.
+3. **IndexNow** (Bing, Yandex, Seznam; finds new pages in minutes): choose a key, set `INDEXNOW_KEY` in Vercel, redeploy, then run `INDEXNOW_KEY=<key> SITE=https://<your-site> npm run indexnow` after big changes.
+4. Make sure `NEXT_PUBLIC_SITE_URL` is your real `https://` address (the sitemap, canonical addresses and structured data all use it).
+5. Check speed and quality any time with `npm run lighthouse`.

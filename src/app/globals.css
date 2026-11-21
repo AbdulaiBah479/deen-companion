@@ -296,3 +296,17 @@ html[data-calm="on"] *, html[data-calm="on"] *::before, html[data-calm="on"] *::
   html.printing-cert .cert { position: absolute; left: 0; top: 0; width: 100%; }
 }
 
+
+/* "Skip to the content": the first thing a keyboard or screen-reader user reaches. */
+.skip-link { position: absolute; left: 8px; top: -60px; z-index: 100; background: #0F766E; color: #fff; padding: 10px 14px; border-radius: 10px; font-weight: 700; }
+.skip-link:focus { top: 8px; }
+/* A clear ring wherever the keyboard is: never hidden, never subtle. */
+:focus-visible { outline: 3px solid #D4AF37; outline-offset: 2px; border-radius: 6px; }
+
+/* Touch comfort: no delay or accidental zoom when tapping, and a gentle press effect instead of the grey flash. */
+a, button, input, select, textarea, summary, label, [role="button"], [role="option"] { touch-action: manipulation; }
+html { -webkit-tap-highlight-color: transparent; scroll-behavior: smooth; }
+button:not(:disabled):active, a[class*="rounded"]:active { opacity: 0.85; }
+button:disabled { cursor: not-allowed; }
+/* Inputs are at least 16px on phones: below that, iPhones zoom the whole page when you tap a field. */
+@media (max-width: 640px) { input:not([type="checkbox"]):not([type="radio"]), select, textarea { font-size: max(16px, 1em); } }

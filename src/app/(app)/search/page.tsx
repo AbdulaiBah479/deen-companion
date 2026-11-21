@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import { Suspense, useEffect, useRef, useState } from 'react'
 import LangSelect from '@/components/LangSelect'
 import { isRtl, useLang } from '@/lib/languages'
+import PageSkeleton from '@/components/PageSkeleton'
 
 type QuranHit = { key: string; arabic: string; text: string }
 type HadithHit = { book: string; bookId: string; number: number; text: string }
@@ -114,7 +115,7 @@ function Search() {
 
 export default function SearchPage() {
   return (
-    <Suspense fallback={<p className="text-gray-500">Loading…</p>}>
+    <Suspense fallback={<PageSkeleton />}>
       <Search />
     </Suspense>
   )

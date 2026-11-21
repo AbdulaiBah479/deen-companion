@@ -1,9 +1,10 @@
 import { Suspense } from 'react'
 import FamilyCircle from '@/components/FamilyCircle'
+import PageSkeleton from '@/components/PageSkeleton'
 
 export default function CirclePage() {
   return (
-    <Suspense fallback={<p className="text-gray-500">Loading…</p>}>
+    <Suspense fallback={<PageSkeleton />}>
       <FamilyCircle />
     </Suspense>
   )

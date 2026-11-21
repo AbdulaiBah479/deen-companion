@@ -183,6 +183,27 @@ export default function DashboardPage() {
         </Link>
       </div>
 
+      {/* Shortcuts to the things people use every day */}
+      <nav aria-label="Shortcuts" className="grid grid-cols-4 gap-2 mb-4" data-testid="shortcuts">
+        {[
+          ['/qibla', '🧭', 'Qibla'],
+          ['/duas', '🤲', 'Duas'],
+          ['/dhikr', '📿', 'Dhikr'],
+          ['/hadith', '📚', 'Hadith'],
+          ['/zakat', '💰', 'Zakat'],
+          ['/tafsir', '📖', 'Tafsir'],
+          ['/names', '✨', '99 Names'],
+          ['/more', '➕', 'All tools'],
+        ]
+          .filter(([href]) => !kids || ['/qibla', '/duas', '/dhikr', '/names', '/more'].includes(href))
+          .map(([href, icon, label]) => (
+          <Link key={href} href={href} className="flex flex-col items-center justify-center gap-1 rounded-2xl bg-white border border-gray-200 py-3 min-h-[72px] text-xs font-semibold text-gray-700 active:scale-95 transition-transform hover:border-[#0F766E]">
+            <span className="text-2xl" aria-hidden="true">{icon}</span>
+            {label}
+          </Link>
+        ))}
+      </nav>
+
       {/* Ayah of the day */}
       {ayah && (
         <section className="bg-white border border-gray-200 rounded-2xl p-5 mb-4" aria-label="Ayah of the day">

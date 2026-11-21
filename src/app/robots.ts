@@ -1,7 +1,12 @@
 import type { MetadataRoute } from 'next'
+import { SITE_URL } from '@/lib/seo'
 
-// Search engines may read the public pages but have no reason to crawl the JSON APIs.
+// Search engines (and AI assistants that read the web) may read every public page. They have no reason to crawl the JSON APIs, the
+// sign-in pages or the owner's control room.
 export default function robots(): MetadataRoute.Robots {
-  const site = (process.env.NEXT_PUBLIC_SITE_URL || '').replace(/[/]$/, '')
-  return { rules: [{ userAgent: '*', allow: '/', disallow: ['/api/', '/admin', '/login', '/signup'] }], ...(site ? { sitemap: site + '/sitemap.xml' } : {}) }
+  const live = !SITE_URL.includes('localhost')
+  return {
+    rules: [{ userAgent: '*', allow: '/', disallow: ['/api/', '/admin', '/login', '/signup', '/offline', '/auth'] }],
+    ...(live ? { sitemap: SITE_URL + '/sitemap.xml', host: SITE_URL } : {}),
+  }
 }

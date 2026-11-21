@@ -1,10 +1,8 @@
 import type { Metadata, Viewport } from "next";
-import { Suspense } from "react";
 import { Amiri_Quran, Geist } from "next/font/google";
 import "./globals.css";
 import ErrorReporter from "@/components/ErrorReporter";
 import RegisterSW from "@/components/RegisterSW";
-import RouteTitle from "@/components/RouteTitle";
 import SyncManager from "@/components/SyncManager";
 
 const geistSans = Geist({
@@ -22,15 +20,22 @@ const quranFont = Amiri_Quran({
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"),
-  title: { default: "Deen Companion", template: "%s · Deen Companion" },
+  applicationName: "Deen Companion",
+  title: { default: "Deen Companion: free Islamic app", template: "%s · Deen Companion" },
   authors: [{ name: "Abdulai Bah" }],
   creator: "Abdulai Bah",
   publisher: "Abdulai Bah",
+  category: "religion",
   other: { copyright: "© 2026 Abdulai Bah. All rights reserved." },
-  openGraph: { siteName: "Deen Companion", type: "website" },
+  openGraph: { siteName: "Deen Companion", type: "website", locale: "en_US" },
   twitter: { card: "summary_large_image" },
   icons: { icon: "/icon.svg", apple: "/apple-touch-icon.png" },
   appleWebApp: { capable: true, title: "Deen", statusBarStyle: "default" },
+  formatDetection: { telephone: false, email: false, address: false },
+  // Search engines may show large previews and full snippets of the pages.
+  robots: { index: true, follow: true, googleBot: { index: true, follow: true, "max-image-preview": "large", "max-snippet": -1, "max-video-preview": -1 } },
+  // Paste the codes from Google Search Console and Bing Webmaster Tools into these settings in Vercel (see the README).
+  verification: { google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION, other: process.env.NEXT_PUBLIC_BING_SITE_VERIFICATION ? { "msvalidate.01": process.env.NEXT_PUBLIC_BING_SITE_VERIFICATION } : undefined },
   description:
     "The complete Islamic hub: Quran with recitation, prayer times, hadith, learning, Islamic reels and an AI companion — free for every Muslim.",
 };
@@ -70,9 +75,6 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="min-h-full flex flex-col bg-[#F8FAFC] text-gray-900">
         {children}
         <RegisterSW />
-        <Suspense fallback={null}>
-          <RouteTitle />
-        </Suspense>
         <ErrorReporter />
         <SyncManager />
       </body>

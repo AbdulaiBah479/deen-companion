@@ -1,10 +1,13 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
+import { clientIp, rateLimit } from '@/lib/ratelimit'
 
 // Live gold & silver spot price (gold-api.com, no key) and currency rates (open.er-api.com, no key).
 // Returns USD per gram plus a rate table so the Zakat calculator can show prices in the user's currency.
 const OUNCE_G = 31.1034768
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const limit = await rateLimit(`metals:${clientIp(request.headers)}`, 30, 60_000)
+  if (!limit.ok) return NextResponse.json({ error: 'Too many requests' }, { status: 429, headers: { 'Retry-After': String(limit.retryAfter) } })
   try {
     const [gold, silver, fx] = await Promise.all([
       fetch('https://api.gold-api.com/price/XAU', { next: { revalidate: 900 } }).then((r) => r.json()),

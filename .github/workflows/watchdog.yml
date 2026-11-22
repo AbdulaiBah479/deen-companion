@@ -11,6 +11,10 @@ on:
     - cron: '23 */3 * * *' # every 3 hours as a backup; cron-job.org is the main clock (every 10 minutes)
   workflow_dispatch:
 
+# These jobs only read the code or call the app, so they get read-only access to the repository.
+permissions:
+  contents: read
+
 jobs:
   watch:
     runs-on: ubuntu-latest

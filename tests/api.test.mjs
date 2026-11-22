@@ -236,6 +236,10 @@ ok('validation: oversize message -> 400', (await askPatient('a'.repeat(2500))).s
   ok('seo: a made-up page is a real 404 (not a soft one)', (await get('/this-page-does-not-exist-xyz')).status === 404)
   for (const bad of ['/quran/999', '/quran/0', '/stories/nope', '/heritage/nope', '/learn/nope', '/learn/seerah/nope', '/books/nope', '/tafsir/999', '/quran/page/9999']) ok(`seo ${bad}: an address that does not exist is a real 404`, (await get(bad)).status === 404)
   for (const good of ['/quran/114', '/stories/adam', '/learn/letters/letters-1', '/learn/words/words-40', '/tafsir/1/7', '/quran/page/604']) ok(`seo ${good}: a real page is not turned away`, (await get(good)).status === 200)
+  // ── hardening ──
+  ok('prayer: an absurdly long or markup-laden place name is refused', (await get('/api/prayer?city=' + 'a'.repeat(200) + '&country=UK')).status === 400 && (await get('/api/prayer?city=' + encodeURIComponent('<script>') + '&country=UK')).status === 400)
+  ok('prayer: a bad method or coordinates are still refused', (await get('/api/prayer?method=99')).status === 400 && (await get('/api/prayer?lat=999&lng=0')).status === 400)
+  ok('tafsir: a malformed verse key is refused', (await get('/api/tafsir?key=2:255;drop')).status === 400)
   const w0 = await get('/api/where')
   ok('/api/where without network position headers says unknown, uncached', w0.status === 404 && /no-store/.test(w0.headers.get('cache-control') || ''))
   const w1 = await fetch(APP + '/api/where', { headers: { 'x-vercel-ip-latitude': '8.4657', 'x-vercel-ip-longitude': '-13.2317', 'x-vercel-ip-city': 'Freetown', 'x-vercel-ip-country': 'SL' } })

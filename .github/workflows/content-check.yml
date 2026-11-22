@@ -7,6 +7,10 @@ on:
     - cron: '17 6 * * 1'
   workflow_dispatch:
 
+# These jobs only read the code or call the app, so they get read-only access to the repository.
+permissions:
+  contents: read
+
 jobs:
   books:
     runs-on: ubuntu-latest

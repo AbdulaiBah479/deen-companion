@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { defaultTafsirFor, isTafsirId } from '@/lib/tafsirs'
 import { fetchTafsir } from '@/lib/tafsir-server'
+import { clientIp, rateLimit } from '@/lib/ratelimit'
 
 // Tafsir for one verse, via api.quran.com, returned as plain-text paragraphs.
 // GET /api/tafsir?key=2:255[&id=169][&lang=ur]  (id must be one of the listed sources; default follows the language)
 export async function GET(request: NextRequest) {
+  const limit = await rateLimit(`tafsir:${clientIp(request.headers)}`, 120, 60_000)
+  if (!limit.ok) return NextResponse.json({ error: 'Too many requests' }, { status: 429, headers: { 'Retry-After': String(limit.retryAfter) } })
   const sp = request.nextUrl.searchParams
   const key = sp.get('key') || ''
   if (!/^\d{1,3}:\d{1,3}$/.test(key)) {

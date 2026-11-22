@@ -37,3 +37,13 @@ did and what you saw. We will answer as soon as we can.
 - **Charity links** added in the control room must be real `https` domain names — no raw IP numbers, internal names, look-alike (punycode) domains, ports or embedded passwords — and every cause card has a “tell us” link for visitors to flag a bad one.
 - **Honest wording:** marketing claims are checked against what the app really contains (25 reciters, 9 hadith collections, 4 games…).
 - **Attack probe:** `npm run test:probe` (also part of `npm run test:full`) tries hostile requests against a running copy: secret files, source maps, cross-site calls, forged admin cookies, broken input, internal-address tricks and error leaks.
+
+## Audit of 22 November 2026
+
+Checked: secrets in the code and in the whole git history (none), every public endpoint (all that change anything or call outside services are rate-limited and size-capped; admin and scheduler routes need the admin cookie or the scheduler secret), the database rules (row-level security is on for all 12 tables, each row visible only to its owner), the browser rules (CSP, frame, referrer, permissions and transport headers are all sent), raw-HTML use (only the fixed start-up script and escaped structured data), the automatic jobs (now read-only access, no secrets in commands), dependencies (0 known problems in what is shipped; the Next.js advisory that stopped builds was fixed by upgrading to 16.4.6), the files a stranger could try to fetch (.env, .git, source maps and source files all refused).
+
+Fixed in this audit: the prayer-time endpoint now rate-limits and refuses oversized or markup-laden place names; the tafsir and gold-price endpoints are rate-limited; the control-room sign-in no longer lets strangers lock the owner out for an hour with 20 wrong tries (now 100 an hour for everyone, 6 per 15 minutes per visitor); the control room tells the owner when the key is shorter than 24 characters; the GitHub jobs run with read-only repository access.
+
+Known and accepted: scripts may run inline (the framework needs it), so the policy cannot name every script; the policy still blocks every outside script, frame and form target. The development tools (Lighthouse, shadcn) carry known advisories; they are never shipped or run on the server.
+
+Only the owner can do: change the control-room key to a 24+ character random one (`npm run secret`), rotate the scheduler secret (it was pasted in a chat), revoke any access token ever pasted in a chat (Vercel, Supabase, GitHub), and turn on two-step sign-in for GitHub, Vercel and Supabase.

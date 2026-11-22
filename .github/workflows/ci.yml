@@ -5,6 +5,10 @@ on:
     branches: [main]
   pull_request:
 
+# These jobs only read the code or call the app, so they get read-only access to the repository.
+permissions:
+  contents: read
+
 jobs:
   check:
     runs-on: ubuntu-latest

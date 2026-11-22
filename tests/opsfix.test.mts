@@ -39,6 +39,15 @@ ok('Android gets the battery advice', ids({}).includes('android-note'))
 ok('an insecure page is flagged first', diagnose({ ...good, secure: false })[0].id === 'https')
 ok('every finding that is not OK says what to do', [{ permission: 'denied' }, { permission: 'default' }, { subscribed: false }, { serverKnows: false }, { serverKnows: null }, { locationSaved: false }, { schedulerOk: false }, { hasPush: false }, { ios: true, standalone: false }].every((f) => diagnose({ ...good, ...(f as Partial<Facts>) }).filter((x) => x.level !== 'ok').every((x) => !!x.fix)))
 
+// ── the automatic jobs get only the access they need ──
+import { readFileSync as read, readdirSync as list } from 'node:fs'
+const WF = new URL('../.github/workflows/', import.meta.url)
+const flows = list(WF).filter((f) => f.endsWith('.yml'))
+const text = (f: string) => read(new URL(f, WF), 'utf8')
+ok('every GitHub workflow declares its permissions (read-only for the code)', flows.length >= 5 && flows.every((f) => text(f).includes('permissions:') && text(f).includes('contents: read')), flows.filter((f) => !text(f).includes('contents: read')).join())
+ok('no workflow is triggered by a stranger’s pull request with secrets (no pull_request_target)', flows.every((f) => !text(f).includes('pull_request_target')))
+ok('secrets are passed to workflow steps as environment variables, never pasted into commands', flows.every((f) => !text(f).split(/\r?\n/).some((l) => l.includes('run:') && l.includes('secrets.'))))
+
 // ── health-check piggyback ──
 ok('health checks are not started when there is no shared store (nothing to take a turn with)', await runAutopilotIfDue() === 'unavailable' && MIN_GAP_MIN >= 5 && MIN_GAP_MIN <= 10)
 

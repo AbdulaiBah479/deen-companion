@@ -18,6 +18,10 @@ on:
     - cron: '11 * * * *' # hourly backup only; a free outside timer (cron-job.org) is the main clock, see README
   workflow_dispatch:
 
+# These jobs only read the code or call the app, so they get read-only access to the repository.
+permissions:
+  contents: read
+
 jobs:
   dispatch:
     runs-on: ubuntu-latest

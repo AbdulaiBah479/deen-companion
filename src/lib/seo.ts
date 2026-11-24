@@ -59,7 +59,7 @@ export const PAGES: Record<string, PageMeta> = {
   '/identify': { title: 'Quran identifier: which verse is this?', description: 'Recite or play a verse and find out which surah and ayah it is. Like a Shazam for the Quran, done on your device.' },
   '/search': { title: 'Search the Quran and hadith', description: 'Search the Quran and hadith by meaning or by word, in several languages, with the matching verses shown first.' },
   '/mosques': { title: 'Find a mosque near you', description: 'Find mosques around you or in any city, with distances and directions, from open map data.', keywords: ['mosque near me', 'find a mosque'] },
-  '/donate': { title: 'Sadaqah journal', description: 'Keep a private record of your charity and giving and see it grow, so that giving becomes a habit.' },
+  '/donate': { title: 'Giving and sadaqah journal', description: 'Support the free Deen Companion app and keep a private record of your charity and giving, so that giving becomes a habit.' },
   '/report': { title: 'Report a problem or suggest an idea', description: 'Found a mistake in a verse, a translation or a feature? Tell us and we will check it. Every report is read.' },
   '/settings': { title: 'Settings', description: 'Language, text size, theme, reading comfort, downloads for offline use, account sync and your data.' },
   '/library/read': { title: 'Read an article from the library', description: 'Read a short, sourced article on the companions, scholars, history and places of Islam, with links to learn more.' },

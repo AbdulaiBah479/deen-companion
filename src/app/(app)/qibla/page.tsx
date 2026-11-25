@@ -41,7 +41,6 @@ export default function QiblaPage() {
       setLabel(info.name)
       remember(c, info.name)
     } catch (e) {
-      if (e === 'denied') setDenied(true)
       // No typing: keep what is known, otherwise fall back to the network's rough position.
       if (!haveRef.current && !(await fromNetwork())) setError(errorMessage(e))
       else if (e === 'denied') setNote('Location is blocked for this site, so this uses a saved or approximate place. Allow location in your browser settings for the exact direction.')
@@ -49,7 +48,6 @@ export default function QiblaPage() {
       setFinding(false)
     }
   }
-  const [denied, setDenied] = useState(false)
   const [note, setNote] = useState('')
   const haveRef = useRef(false)
 
@@ -87,7 +85,6 @@ export default function QiblaPage() {
     }
     permissionState().then(async (p) => {
       if (p.state === 'denied') {
-        setDenied(true)
         if (!known && !(await fromNetwork())) setError(errorMessage('denied'))
         else setNote('Location is blocked for this site, so this uses a saved or approximate place. Allow location in your browser settings for the exact direction.')
       } else {
